@@ -1,52 +1,43 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Collections.Generic;
 using System.Management.Automation;
 using Microsoft.Win32;
-using System.Security.AccessControl;
+
 
 namespace PSRegistry
 {
-    [Cmdlet(VerbsCommon.Move, "RegKey")]
+    [Cmdlet(VerbsCommon.Move, "RegKey", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High)]
     [OutputType(typeof(RegistryKey))]
 
-    public sealed class MoveRegKeyCommand : PSCmdlet
+    public sealed class MoveRegKeyCommand : Cmdlet
     {
-        #region Parameters
-        [Parameter(Position = 0, Mandatory = true)]
-        [ValidateNotNullOrEmpty]
-        public string[] Path { get; set; }
+        private Dictionary<RegistryHive, List<string>> _GroupedRegKeysToProcess;
 
-        [Parameter(Position = 1)]
+        #region Parameters
+        [Parameter(Position = 0, Mandatory = true, ValueFromPipeline = true)]
+        [RegKeyTransform]
+        [ValidateNotNullOrEmpty]
+        [Alias("Source", "Path")]
+        public RegistryKey RegKey { get; set; }
+
+        [Parameter(Position = 1, Mandatory = true)]
+        public string[] Destination { get; set; }
+
+        [Parameter(Position = 2)]
         [Alias("PSComputerName")]
         public string[] ComputerName { get; set; } = new string[] { string.Empty };
 
         [Parameter()]
-        public SwitchParameter Recurse { get; set; }
-
-        [Parameter()]
-        public int Depth { get; set; } = int.MaxValue;
-
-        [Parameter()]
-        public SwitchParameter KeyOnly { get; set; }
-
-        [Parameter()]
-        public SwitchParameter NoValueType { get; set; }
-
-        [Parameter()]
-        public RegistryKeyPermissionCheck PermissionCheck { get; set; } = RegistryKeyPermissionCheck.Default;
-
-        [Parameter()]
-        public RegistryRights RegistryRights { get; set; } = (RegistryRights.ReadKey & RegistryRights.WriteKey);
-
-        [Parameter()]
-        public RegistryView RegistryView { get; set; } = RegistryView.Default;
+        public RegistryView View { get; set; } = RegistryView.Default;
         #endregion
-        protected override void ProcessRecord()
+
+        protected override void BeginProcessing()
         {
+            _GroupedRegKeysToProcess = Utility.GroupKeyPathsByBaseKey(Destination, this);
         }
 
+        protected override void ProcessRecord()
+        {
+            Utility.CopyRegistryCommand(this, _GroupedRegKeysToProcess);
+        }
     }
 }

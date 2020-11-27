@@ -37,10 +37,6 @@ namespace PSRegistry
         [Parameter()]
         public SwitchParameter KeyOnly { get; set; }
 
-        /// <summary>Do not get the value type of registry values. Will instead return "Unknown"</summary>
-        [Parameter()]
-        public SwitchParameter NoValueType { get; set; }
-
         [Parameter()]
         public RegistryKeyPermissionCheck PermissionCheck { get; set; } = RegistryKeyPermissionCheck.ReadWriteSubTree;
 
@@ -58,7 +54,6 @@ namespace PSRegistry
         protected override void BeginProcessing()
         {
             _GroupedRegKeysToProcess=Utility.GroupKeyPathsByBaseKey(Path, this);
-            WriteVerbose(Rights.ToString());
         }
 
         protected override void ProcessRecord()
@@ -96,10 +91,14 @@ namespace PSRegistry
                             {
                                 WriteVerbose($"{pcName}: Opening sub key {subKeyPath}");
                                 subKey = baseKey.OpenSubKey(subKeyPath, PermissionCheck, Rights);
+                                if (null == subKey)
+                                {
+                                    throw new ItemNotFoundException();
+                                }
                             }
                             catch (Exception e) when (e is PipelineStoppedException == false)
                             {
-                                WriteError(new ErrorRecord(e, "UnableToOpenSubKey", Utility.GetErrorCategory(e), pcName));
+                                WriteError(new ErrorRecord(e, "UnableToOpenSubKey", Utility.GetErrorCategory(e), subKeyPath));
                                 continue;
                             }
                         }
@@ -144,12 +143,12 @@ namespace PSRegistry
                                         }
                                     }
                                 }
-                                WriteRegKeyToPipeline(currentKey);
+                                Utility.WriteRegKeyToPipeline(this, currentKey, pcName, KeyOnly, ValueOptions, true);
                             } while (subKeysToCheck.Count >0);
                         }
                         else
                         {
-                            WriteRegKeyToPipeline(subKey);
+                            Utility.WriteRegKeyToPipeline(this, subKey, pcName, KeyOnly, ValueOptions, true);
                         }
                     }
                     if (shouldDisposeBaseKey)
@@ -157,29 +156,6 @@ namespace PSRegistry
                         baseKey.Dispose();
                     }
                 }
-            }
-        }
-        
-        public void WriteRegKeyToPipeline(RegistryKey regKey)
-        {
-            if (KeyOnly)
-            {
-                WriteObject(regKey);
-            }
-            else
-            {
-                var registryProperties = new RegistryProperty[0];
-                try
-                {
-                    registryProperties = Utility.GetRegistryProperty(regKey, ValueOptions, !NoValueType);
-                }
-                catch (Exception e) when (e is PipelineStoppedException == false)
-                {
-                    WriteError(new ErrorRecord(e, "UnableToGetProperties", Utility.GetErrorCategory(e), regKey));
-                }
-                var objectToWrite = PSObject.AsPSObject(regKey);
-                objectToWrite.Members.Add(new PSNoteProperty("Property", registryProperties));
-                WriteObject(objectToWrite);
             }
         }
     }

@@ -52,6 +52,7 @@
     <Compile Include="ImportRegKeyCommand.cs" />
     <Compile Include="MountRegHiveCommand.cs" />
     <Compile Include="MoveRegKeyCommand.cs" />
+    <Compile Include="NativeMethods.cs" />
     <Compile Include="NewRegKeyCommand.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RemoveRegKeyCommand.cs" />

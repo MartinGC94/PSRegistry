@@ -1,8 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Management.Automation;
 using Microsoft.Win32;
 using System.Security.AccessControl;
@@ -13,8 +10,10 @@ namespace PSRegistry
     [Cmdlet(VerbsCommon.New, "RegKey")]
     [OutputType(typeof(RegistryKey))]
 
-    public sealed class NewRegKeyCommand : PSCmdlet
+    public sealed class NewRegKeyCommand : Cmdlet
     {
+        private Dictionary<RegistryHive, List<string>> _GroupedRegKeysToProcess;
+
         #region Parameters
         [Parameter(Position = 0, Mandatory = true)]
         [ValidateNotNullOrEmpty]
@@ -25,29 +24,78 @@ namespace PSRegistry
         public string[] ComputerName { get; set; } = new string[] { string.Empty };
 
         [Parameter()]
-        public SwitchParameter Recurse { get; set; }
+        public RegistryKeyPermissionCheck RegPermissionCheck { get; set; } = RegistryKeyPermissionCheck.Default;
 
         [Parameter()]
-        public int Depth { get; set; } = int.MaxValue;
+        public RegistryView RegView { get; set; } = RegistryView.Default;
 
         [Parameter()]
-        public SwitchParameter KeyOnly { get; set; }
+        public RegistryOptions RegOptions { get; set; } = RegistryOptions.None;
 
         [Parameter()]
-        public SwitchParameter NoValueType { get; set; }
-
-        [Parameter()]
-        public RegistryKeyPermissionCheck PermissionCheck { get; set; } = RegistryKeyPermissionCheck.Default;
-
-        [Parameter()]
-        public RegistryRights RegistryRights { get; set; } = (RegistryRights.ReadKey & RegistryRights.WriteKey);
-
-        [Parameter()]
-        public RegistryView RegistryView { get; set; } = RegistryView.Default;
+        public RegistrySecurity ACL { get; set; }
         #endregion
-        protected override void ProcessRecord()
+
+        protected override void BeginProcessing()
         {
+            _GroupedRegKeysToProcess = Utility.GroupKeyPathsByBaseKey(Path, this);
         }
 
+        protected override void ProcessRecord()
+        {
+            foreach (string pcName in ComputerName)
+            {
+                foreach (RegistryHive hive in _GroupedRegKeysToProcess.Keys)
+                {
+                    RegistryKey baseKey;
+                    try
+                    {
+                        WriteVerbose($"{pcName}: Opening base key {hive}");
+                        baseKey = RegistryKey.OpenRemoteBaseKey(hive, pcName, RegView);
+                    }
+                    catch (Exception e) when (e is PipelineStoppedException == false)
+                    {
+                        WriteError(new ErrorRecord(e, "UnableToOpenBaseKey", Utility.GetErrorCategory(e), pcName));
+                        continue;
+                    }
+                    foreach (string subKeyPath in _GroupedRegKeysToProcess[hive])
+                    {
+                        if (subKeyPath == string.Empty)
+                        {
+                            var e = new ArgumentException();
+                            WriteError(new ErrorRecord(e, "EmptySubKeyPath", Utility.GetErrorCategory(e), subKeyPath));
+                            continue;
+                        }
+                        RegistryKey newKey;
+                        try
+                        {
+                            if (ACL != null)
+                            {
+                                newKey = baseKey.CreateSubKey(subKeyPath, RegPermissionCheck, RegOptions, ACL);
+                            }
+                            else
+                            {
+                                newKey = baseKey.CreateSubKey(subKeyPath, RegPermissionCheck, RegOptions);
+                            }
+                        }
+                        catch (Exception e) when (e is PipelineStoppedException == false)
+                        {
+                            WriteError(new ErrorRecord(e, "UnableToCreateKey", Utility.GetErrorCategory(e), subKeyPath));
+                            continue;
+                        }
+
+                        if (newKey == null)
+                        {
+                            var e = new ArgumentNullException();
+                            WriteError(new ErrorRecord(e, "NewKeyWasNull", Utility.GetErrorCategory(e), subKeyPath));
+                            continue;
+                        }
+
+                        Utility.WriteRegKeyToPipeline(this, newKey, pcName, true, RegistryValueOptions.None, false);
+                    }
+                    baseKey.Dispose();
+                }
+            }
+        }
     }
 }

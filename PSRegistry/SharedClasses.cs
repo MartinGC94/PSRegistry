@@ -1,11 +1,9 @@
 ﻿using Microsoft.Win32;
-using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using System.Management.Automation;
-using System.Text;
-using System.Threading.Tasks;
+using System;
+
 
 namespace PSRegistry
 {
@@ -19,23 +17,42 @@ namespace PSRegistry
     {
         public override object Transform(EngineIntrinsics engineIntrinsics, object inputData)
         {
-            if (inputData is RegistryKey)
+
+            if (inputData is RegistryKey || inputData is PSObject && (inputData as PSObject).BaseObject is RegistryKey)
             {
                 return inputData;
             }
 
-            string inputDataAsString = inputData as string;
-            string[] targetComputer = new string[] {string.Empty};
-            string[] path = new string[] {inputDataAsString};
-
-            if (inputDataAsString.StartsWith("\\\\"))
+            string[] path;
+            if (inputData is string)
             {
-                targetComputer[0] = inputDataAsString.Split('\\')[2];
-                path[0] = inputDataAsString.Substring(targetComputer.Length + 3);
+                path = new string[] { inputData as string };
             }
-            Cmdlet commandToRun = new GetRegKeyCommand() { Path = path, ComputerName =targetComputer, KeyOnly = true};
-            var commandResult = commandToRun.Invoke<RegistryKey>();
-            return commandResult.ToArray();
+            else
+            {
+                path = Array.ConvertAll(inputData as object[],item => item.ToString());
+            }
+
+            Cmdlet commandToRun = new GetRegKeyCommand()
+            {
+                Path = path,
+                KeyOnly = true
+            };
+            var commandOutput = commandToRun.Invoke().GetEnumerator();
+
+            var resultData = new List<PSObject>();
+            while (commandOutput.MoveNext())
+            {
+                resultData.Add(commandOutput.Current as PSObject);
+            }
+            if (resultData.Count == 1)
+            {
+                return resultData[0];
+            }
+            else
+            {
+                return resultData.ToArray();
+            }
         }
     }
     public class RegPropertyTransform : ArgumentTransformationAttribute

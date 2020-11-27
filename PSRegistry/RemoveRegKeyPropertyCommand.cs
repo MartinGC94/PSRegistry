@@ -1,52 +1,46 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Management.Automation;
 using Microsoft.Win32;
-using System.Security.AccessControl;
 
 namespace PSRegistry
 {
-    [Cmdlet(VerbsCommon.Remove, "RegKeyProperty")]
+    [Cmdlet(VerbsCommon.Remove, "RegKeyProperty",SupportsShouldProcess = true,ConfirmImpact = ConfirmImpact.Medium)]
     [OutputType(typeof(RegistryKey))]
 
-    public sealed class RemoveRegKeyPropertyCommand : PSCmdlet
+    public sealed class RemoveRegKeyPropertyCommand : Cmdlet
     {
+        private const string _WhatIfText = "Will delete \"{0}\" property from \"{1}\"";
+        private const string _ConfirmText = "Delete \"{0}\" property from \"{1}\"?";
+
         #region Parameters
-        [Parameter(Position = 0, Mandatory = true)]
+        [Parameter(Position = 0, Mandatory = true, ValueFromPipeline = true)]
+        [RegKeyTransform]
         [ValidateNotNullOrEmpty]
-        public string[] Path { get; set; }
+        public RegistryKey[] RegKey { get; set; }
 
-        [Parameter(Position = 1)]
-        [Alias("PSComputerName")]
-        public string[] ComputerName { get; set; } = new string[] { string.Empty };
-
-        [Parameter()]
-        public SwitchParameter Recurse { get; set; }
-
-        [Parameter()]
-        public int Depth { get; set; } = int.MaxValue;
-
-        [Parameter()]
-        public SwitchParameter KeyOnly { get; set; }
-
-        [Parameter()]
-        public SwitchParameter NoValueType { get; set; }
-
-        [Parameter()]
-        public RegistryKeyPermissionCheck PermissionCheck { get; set; } = RegistryKeyPermissionCheck.Default;
-
-        [Parameter()]
-        public RegistryRights RegistryRights { get; set; } = (RegistryRights.ReadKey & RegistryRights.WriteKey);
-
-        [Parameter()]
-        public RegistryView RegistryView { get; set; } = RegistryView.Default;
+        [Parameter(Mandatory = true)]
+        [Alias("Name")]
+        public string[] PropertyName { get; set; }
         #endregion
         protected override void ProcessRecord()
         {
+            foreach (var key in RegKey)
+            {
+                foreach (var name in PropertyName)
+                {
+                    try
+                    {
+                        if (ShouldProcess(string.Format(_WhatIfText,name,key.Name),string.Format(_ConfirmText,name,key.Name),"Confirm"))
+                        {
+                            key.DeleteValue(name, true);
+                        }
+                    }
+                    catch (Exception e) when (e is PipelineStoppedException == false)
+                    {
+                        WriteError(new ErrorRecord(e, "UnableToRemoveValue", Utility.GetErrorCategory(e), name));
+                    }
+                }
+            }
         }
     }
-
 }

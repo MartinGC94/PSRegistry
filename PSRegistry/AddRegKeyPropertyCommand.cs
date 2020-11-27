@@ -63,8 +63,8 @@ namespace PSRegistry
                             switch (property.Type)
                             {
                                 case RegistryValueKind.Binary:
-                                    break;
                                     actualValue = new byte[0];
+                                    break;
                                 case RegistryValueKind.DWord:
                                     actualValue = 0;
                                     break;
