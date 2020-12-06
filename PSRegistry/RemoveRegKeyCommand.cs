@@ -1,27 +1,28 @@
-﻿using System;
+﻿using Microsoft.Win32;
+using System;
 using System.Management.Automation;
-using Microsoft.Win32;
 using System.Security.AccessControl;
 
 namespace PSRegistry
 {
-    [Cmdlet(VerbsCommon.Remove, "RegKey",SupportsShouldProcess = true,ConfirmImpact = ConfirmImpact.High)]
-    [OutputType(typeof(RegistryKey))]
+    [Cmdlet(VerbsCommon.Remove, "RegKey", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High)]
 
     public sealed class RemoveRegKeyCommand : Cmdlet
     {
-        private const char   _PathSeparator      = '\\';
-        private const string _WhatIfText         = "Will delete key: \"{0}\"";
-        private const string _ConfirmText        = "Delete key: \"{0}\"?";
+        private const string _WhatIfText  = "Will delete key: \"{0}\"";
+        private const string _ConfirmText = "Delete key: \"{0}\"?";
 
         #region Parameters
+        /// <summary>The path to the registry key. This only supports the full path (HKLM:\System or HKEY_LOCAL_MACHINE\System)</summary>
         [Parameter(Position = 0, Mandatory = true, ValueFromPipelineByPropertyName = true)]
         [Alias("Name")]
         public string[] Path { get; set; }
 
+        /// <summary>The computer to connect to. Default value is empty meaning that you are connecting to the local computer.</summary>
         [Parameter(Position = 1, ValueFromPipelineByPropertyName = true)]
         public string[] ComputerName { get; set; } = new string[] { string.Empty };
 
+        /// <summary>Specifies if keys with subkeys can be deleted.</summary>
         [Parameter()]
         public SwitchParameter Recurse { get; set; }
         #endregion
@@ -29,36 +30,36 @@ namespace PSRegistry
         {
             foreach (string PathString in Path)
             {
-                string trimmedPathString = PathString.Trim(_PathSeparator);
-                int indexOfLastSeparator = trimmedPathString.LastIndexOf(_PathSeparator);
+                string trimmedPathString = PathString.Trim(Utility._RegPathSeparator);
+                int indexOfLastSeparator = trimmedPathString.LastIndexOf(Utility._RegPathSeparator);
                 if (indexOfLastSeparator < 0)
                 {
                     //String looks like a basekey due to a lack of separators. Basekeys cannot be deleted.
-                    var e = new NotSupportedException();
+                    NotSupportedException e = new NotSupportedException();
                     WriteError(new ErrorRecord(e, "UnableToDeleteBasekey", Utility.GetErrorCategory(e), PathString));
                     continue;
                 }
                 string[] parentPath = new string[] { PathString.Substring(0, indexOfLastSeparator) };
                 string childPath = trimmedPathString.Substring(indexOfLastSeparator+1);
 
-                var commandToRun = new GetRegKeyCommand()
+                GetRegKeyCommand commandToRun = new GetRegKeyCommand()
                 {
                     Path = parentPath,
                     ComputerName = ComputerName,
                     Rights = (RegistryRights.Delete | RegistryRights.EnumerateSubKeys | RegistryRights.QueryValues | RegistryRights.SetValue),
-                    PermissionCheck= RegistryKeyPermissionCheck.ReadWriteSubTree,
+                    KeyPermissionCheck= RegistryKeyPermissionCheck.ReadWriteSubTree,
                     KeyOnly = true
                 };
-                var commandOutput= commandToRun.Invoke().GetEnumerator();
+                System.Collections.IEnumerator commandOutput = commandToRun.Invoke().GetEnumerator();
                 while (commandOutput.MoveNext())
                 {
                     RegistryKey key = (commandOutput.Current as PSObject).BaseObject as RegistryKey;
                     try
                     {
-                        string actualWhatIfText  = string.Format(_WhatIfText,  $"{key.Name}\\{childPath}");
-                        string actualConfirmText = string.Format(_ConfirmText, $"{key.Name}\\{childPath}");
+                        string actualWhatIfText  = string.Format(_WhatIfText,  $"{key.Name}{Utility._RegPathSeparator}{childPath}");
+                        string actualConfirmText = string.Format(_ConfirmText, $"{key.Name}{Utility._RegPathSeparator}{childPath}");
 
-                        if (ShouldProcess(actualWhatIfText, actualConfirmText, "Confirm"))
+                        if (ShouldProcess(actualWhatIfText, actualConfirmText, Utility._ConfirmPrompt))
                         {
                             if (Recurse)
                             {

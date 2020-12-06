@@ -1,7 +1,8 @@
-﻿using System;
-using System.Management.Automation;
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
+using System;
+using System.Collections.Generic;
 using System.ComponentModel;
+using System.Management.Automation;
 
 namespace PSRegistry
 {
@@ -9,34 +10,54 @@ namespace PSRegistry
 
     public sealed class MountRegHiveCommand : PSCmdlet
     {
+        private Dictionary<RegistryHive, List<string>> _GroupedRegKeysToProcess;
+        private bool _PrivWasPreviouslyEnabled;
+
         #region Parameters
+        /// <summary>The path to the registry database file that should be mounted.</summary>
         [Parameter(Position = 0, Mandatory = true)]
         [ValidateNotNullOrEmpty]
         [Alias("FilePath")]
         public string Path { get; set; }
 
-        [Parameter(Position = 1,Mandatory = true)]
-        [ValidateSet("LocalMachine", "Users")]
-        public RegistryHive MountHive { get; set; }
+        /// <summary>The registry path where the hive should be mounted.</summary>
+        [Parameter(Position = 1, Mandatory = true)]
+        [ValidateNotNullOrEmpty]
+        [Alias("MountPath")]
+        public string DestinationPath { get; set; }
 
-        [Parameter(Position = 2,Mandatory = true)]
-        public string SubKeyName { get; set; }
-
-        [Parameter(Position = 3)]
+        /// <summary>The computer where the registry hive is mounted.</summary>
+        [Parameter(Position = 2)]
         public string ComputerName { get; set; } = string.Empty;
+
+        /// <summary>The registry view to use.</summary>
+        [Parameter()]
+        public RegistryView View { get; set; } = RegistryView.Default;
         #endregion
+
+        protected override void BeginProcessing()
+        {
+            _GroupedRegKeysToProcess = Utility.GroupKeyPathsByBaseKey(new string[1] {DestinationPath}, this);
+            NativeMethods.RtlAdjustPrivilege((ulong)Utility.WindowsPrivileges.SeRestorePrivilege, true, false, out _PrivWasPreviouslyEnabled);
+        }
+
         protected override void ProcessRecord()
         {
-            bool privWasPreviouslyEnabled=false;
-            string filePath = GetUnresolvedProviderPathFromPSPath(Path);
             RegistryKey baseKey = null;
+            string filePath = null;
             try
             {
-                NativeMethods.RtlAdjustPrivilege((ulong)Utility.WindowsPrivileges.SeRestorePrivilege, true, false, out privWasPreviouslyEnabled);
+                //Get file path for the file to mount, and the registry hive + subkey to mount it to.
+                filePath = GetUnresolvedProviderPathFromPSPath(Path);
+                Dictionary<RegistryHive, List<string>>.KeyCollection.Enumerator enumerator = _GroupedRegKeysToProcess.Keys.GetEnumerator();
+                enumerator.MoveNext();
+                RegistryHive mountHive = enumerator.Current;
+                string mountSubKey=_GroupedRegKeysToProcess[mountHive][0];
 
-                baseKey = RegistryKey.OpenRemoteBaseKey(MountHive, ComputerName);
 
-                int returnCode = NativeMethods.RegLoadKey(baseKey.Handle.DangerousGetHandle(), SubKeyName, filePath);
+                baseKey = RegistryKey.OpenRemoteBaseKey(mountHive, ComputerName,View);
+
+                int returnCode = NativeMethods.RegLoadKey(baseKey.Handle.DangerousGetHandle(), mountSubKey, filePath);
                 if (returnCode != 0)
                 {
                     throw new Win32Exception(returnCode);
@@ -52,10 +73,13 @@ namespace PSRegistry
                 {
                     baseKey.Dispose();
                 }
-                if (!privWasPreviouslyEnabled)
-                {
-                    NativeMethods.RtlAdjustPrivilege((ulong)Utility.WindowsPrivileges.SeRestorePrivilege, false, false, out privWasPreviouslyEnabled);
-                }
+            }
+        }
+        protected override void EndProcessing()
+        {
+            if (!_PrivWasPreviouslyEnabled)
+            {
+                NativeMethods.RtlAdjustPrivilege((ulong)Utility.WindowsPrivileges.SeRestorePrivilege, false, false, out _PrivWasPreviouslyEnabled);
             }
         }
     }

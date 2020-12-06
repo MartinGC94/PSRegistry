@@ -7,17 +7,24 @@ Examples include:
 * Improved performance
 * Remote management without WinRM
 * Easier syntax (no need to create PS drives for HKU and other registry hives, allows both the full and short names for hives like HKLM or HKEY_LOCAL_MACHINE)
-* (TODO:) Ability to mount offline registry hives.
-* (TODO:) ability to import/export registry keys in the common .reg file format
+* Ability to mount offline registry hives.
 
 
-## Usage
-
-There are many configuration options, see the options to `Set-PSReadLineOption`.  `PSReadLine` has help for it's cmdlets as well as an `about_PSReadLine` topic - see those topics for more detailed help.
-
-To set your own custom keybindings, use the cmdlet `Set-PSReadLineKeyHandler`. For example, for a better history experience, try:
+## Examples
 
 ```powershell
-Set-PSReadLineKeyHandler -Key UpArrow -Function HistorySearchBackward
-Set-PSReadLineKeyHandler -Key DownArrow -Function HistorySearchForward
+#Add 2 properties to a key. Argument transformation is used to convert the string and hashtable into their correct types.
+Add-RegKeyProperty -Key "HKEY_CURRENT_USER\Console" -Property @{
+    QuickEdit=1
+    LineWrap=1
+}
+
+#Mount the default user registry hive, change the quick edit mode for the console and dismount the hive again.
+Mount-RegHive -Path "C:\Users\Default\NTUSER.DAT" -DestinationPath HKLM:\TempMount
+Add-RegKeyProperty -Key HKLM:\TempMount\Console -Name QuickEdit -Value 1 -ValueKind DWord
+Dismount-RegHive -Path HKLM:\TempMount
+
+#Copy the current user console settings to a different user
+Copy-RegKey -Key HKCU:\Console -Destination "HKEY_USERS\S-1-5-21-735598605-1552820368-3346217319-1001\Console"
+
 ```

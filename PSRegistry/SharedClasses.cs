@@ -1,19 +1,19 @@
 ﻿using Microsoft.Win32;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Management.Automation;
-using System;
 
 
 namespace PSRegistry
 {
-    public class RegistryProperty
+    public sealed class RegistryProperty
     {
         public string Name { get; set; }
         public object Value { get; set; }
         public RegistryValueKind Type { get; set; }
     }
-    public class RegKeyTransform : ArgumentTransformationAttribute
+    internal sealed class RegKeyTransform : ArgumentTransformationAttribute
     {
         public override object Transform(EngineIntrinsics engineIntrinsics, object inputData)
         {
@@ -30,7 +30,7 @@ namespace PSRegistry
             }
             else
             {
-                path = Array.ConvertAll(inputData as object[],item => item.ToString());
+                path = Array.ConvertAll(inputData as object[], item => item.ToString());
             }
 
             Cmdlet commandToRun = new GetRegKeyCommand()
@@ -38,9 +38,9 @@ namespace PSRegistry
                 Path = path,
                 KeyOnly = true
             };
-            var commandOutput = commandToRun.Invoke().GetEnumerator();
+            IEnumerator commandOutput = commandToRun.Invoke().GetEnumerator();
 
-            var resultData = new List<PSObject>();
+            List<PSObject> resultData = new List<PSObject>();
             while (commandOutput.MoveNext())
             {
                 resultData.Add(commandOutput.Current as PSObject);
@@ -55,7 +55,7 @@ namespace PSRegistry
             }
         }
     }
-    public class RegPropertyTransform : ArgumentTransformationAttribute
+    internal sealed class RegPropertyTransform : ArgumentTransformationAttribute
     {
         public override object Transform(EngineIntrinsics engineIntrinsics, object inputData)
         {
@@ -64,10 +64,10 @@ namespace PSRegistry
                 return inputData;
             }
             Hashtable inputDataAsHashtable = inputData as Hashtable;
-            var result = new List<RegistryProperty>();
-            foreach (var key in inputDataAsHashtable.Keys)
+            List<RegistryProperty> result = new List<RegistryProperty>();
+            foreach (object key in inputDataAsHashtable.Keys)
             {
-                result.Add( new RegistryProperty() { Name = key.ToString(), Type = RegistryValueKind.Unknown, Value = inputDataAsHashtable[key] });
+                result.Add(new RegistryProperty() { Name = key.ToString(), Type = RegistryValueKind.Unknown, Value = inputDataAsHashtable[key] });
             }
             return result.ToArray();
         }

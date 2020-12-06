@@ -6,12 +6,17 @@ using System.Text.RegularExpressions;
 using System.Security;
 using System.ComponentModel;
 using System.Security.AccessControl;
+using System.IO;
 
 namespace PSRegistry
 {
-    public class Utility
+    internal sealed class Utility
     {
-        public enum WindowsPrivileges : ulong
+        internal const char _RegPathSeparator = '\\';
+        internal const string _ConfirmPrompt = "Confirm";
+
+        /// <summary>Enum for all the different windows privileges that can be enabled.</summary>
+        internal enum WindowsPrivileges : ulong
         {
             SeCreateTokenPrivilege = 1,
             SeAssignPrimaryTokenPrivilege = 2,
@@ -49,20 +54,28 @@ namespace PSRegistry
             SeTimeZonePrivilege = 34,
             SeCreateSymbolicLinkPrivilege = 35
         }
-        public static Dictionary<string, RegistryHive> hiveNameTable = new Dictionary<string, RegistryHive>(StringComparer.OrdinalIgnoreCase)
+
+        /// <summary>Dictionary for translating basekey names into their equivalent RegistryHive enum value.</summary>
+        private static readonly Dictionary<string, RegistryHive> hiveNameTable = new Dictionary<string, RegistryHive>(StringComparer.OrdinalIgnoreCase)
         {
-            {"HKCU",               RegistryHive.CurrentUser },
-            {"HKLM",               RegistryHive.LocalMachine },
-            {"HKU",                RegistryHive.Users },
-            {"HKCR",               RegistryHive.ClassesRoot },
-            {"HKEY_CURRENT_USER",  RegistryHive.CurrentUser },
-            {"HKEY_LOCAL_MACHINE", RegistryHive.LocalMachine },
-            {"HKEY_USERS",         RegistryHive.Users },
-            {"HKEY_CLASSES_ROOT",  RegistryHive.ClassesRoot },
+            {"HKCR",                  RegistryHive.ClassesRoot },
+            {"HKCU",                  RegistryHive.CurrentUser },
+            {"HKLM",                  RegistryHive.LocalMachine },
+            {"HKU",                   RegistryHive.Users },
+            {"HKPD",                  RegistryHive.PerformanceData },
+            {"HKCC",                  RegistryHive.CurrentConfig },
+            {"HKEY_CLASSES_ROOT",     RegistryHive.ClassesRoot },
+            {"HKEY_CURRENT_USER",     RegistryHive.CurrentUser },
+            {"HKEY_LOCAL_MACHINE",    RegistryHive.LocalMachine },
+            {"HKEY_USERS",            RegistryHive.Users },
+            {"HKEY_PERFORMANCE_DATA", RegistryHive.PerformanceData },
+            {"HKEY_CURRENT_CONFIG",   RegistryHive.CurrentConfig }
         };
-        public static Dictionary<RegistryHive, List<string>> GroupKeyPathsByBaseKey(string[] regKeyPath, Cmdlet cmdlet)
+
+        /// <summary>Method for getting the basekey + subkeys from the path input as a Dictionary.</summary>
+        internal static Dictionary<RegistryHive, List<string>> GroupKeyPathsByBaseKey(string[] regKeyPath, Cmdlet cmdlet)
         {
-            var returnDictionary = new Dictionary<RegistryHive, List<string>>();
+            Dictionary<RegistryHive, List<string>> returnDictionary = new Dictionary<RegistryHive, List<string>>();
             foreach (string path in regKeyPath)
             {
                 RegistryHive baseKey;
@@ -70,18 +83,12 @@ namespace PSRegistry
 
                 if (!hiveNameTable.TryGetValue(splitPath[0], out baseKey))
                 {
-                    cmdlet.WriteError(
-                        new ErrorRecord(
-                                new ArgumentException(),
-                                "InvalidPath",
-                                ErrorCategory.InvalidArgument,
-                                path
-                            )
-                        );
+                    ArgumentException e = new ArgumentException();
+                    cmdlet.WriteError(new ErrorRecord(e, "InvalidPath",GetErrorCategory(e), path));
                 }
                 else
                 {
-                    string subKey = path.Replace(":", "").Replace(splitPath[0], "").Trim('\\');
+                    string subKey = path.Replace(":", string.Empty).Replace(splitPath[0], string.Empty).Trim(_RegPathSeparator);
                     if (returnDictionary.ContainsKey(baseKey))
                     {
                         returnDictionary[baseKey].Add(subKey);
@@ -94,15 +101,17 @@ namespace PSRegistry
             }
             return returnDictionary;
         }
-        public static RegistryProperty[] GetRegistryProperty(RegistryKey regKey, RegistryValueOptions valueOptions, bool includeValueKind)
+
+        /// <summary>Method for getting the basekey + subkeys from the path input as a Dictionary.</summary>
+        internal static RegistryProperty[] GetRegistryProperty(RegistryKey regKey, RegistryValueOptions valueOptions, bool includeValueKind)
         {
-            var valueNames = regKey.GetValueNames();
-            var valueKind = RegistryValueKind.Unknown;
-            var returnData = new RegistryProperty[valueNames.Length];
+            string[] valueNames = regKey.GetValueNames();
+            RegistryValueKind valueKind = RegistryValueKind.Unknown;
+            RegistryProperty[] returnData = new RegistryProperty[valueNames.Length];
 
             for (int i = 0; i < valueNames.Length; i++)
             {
-                var value = regKey.GetValue(valueNames[i], null, valueOptions);
+                object value = regKey.GetValue(valueNames[i], null, valueOptions);
                 if (includeValueKind)
                 {
                     valueKind = regKey.GetValueKind(valueNames[i]);
@@ -111,23 +120,33 @@ namespace PSRegistry
             }
             return returnData;
         }
-        public static ErrorCategory GetErrorCategory(Exception exception)
+
+        /// <summary>Method for getting the relevant error category based on the exception input.</summary>
+        internal static ErrorCategory GetErrorCategory(Exception exception)
         {
             switch (exception)
             {
                 case ArgumentNullException _:
                     return ErrorCategory.InvalidArgument;
+                case ArgumentException _:
+                    return ErrorCategory.InvalidArgument;
                 case ObjectDisposedException _:
                     return ErrorCategory.ResourceUnavailable;
+                case UnauthorizedAccessException _:
+                    return ErrorCategory.PermissionDenied;
                 case SecurityException _:
                     return ErrorCategory.PermissionDenied;
+                case IOException _:
+                    return ErrorCategory.ResourceUnavailable;
                 default:
                     return ErrorCategory.NotSpecified;
             }
         }
-        public static void WriteRegKeyToPipeline(Cmdlet cmdlet, RegistryKey regKey, string pcName, bool keyOnly, RegistryValueOptions valueOptions, bool includeValueKind)
+
+        /// <summary>Method for adding additional members to RegistryKey objects and writing them to the Powershell pipeline.</summary>
+        internal static void WriteRegKeyToPipeline(Cmdlet cmdlet, RegistryKey regKey, string pcName, bool keyOnly, RegistryValueOptions valueOptions, bool includeValueKind)
         {
-            var objectToWrite = new PSObject(regKey);
+            PSObject objectToWrite = new PSObject(regKey);
             objectToWrite.Members.Add(new PSNoteProperty("ComputerName", pcName), true);
 
             RegistryProperty[] registryProperties = new RegistryProperty[0];
@@ -146,7 +165,9 @@ namespace PSRegistry
 
             cmdlet.WriteObject(objectToWrite);
         }
-        public static void CopyRegistryKey(RegistryKey source, RegistryKey destination, bool deleteSource=false)
+
+        /// <summary>Method invoking the native method for copying registry keys and optionally delete the source key</summary>
+        internal static void CopyRegistryKey(RegistryKey source, RegistryKey destination ,bool deleteSource=false)
         {
             int returnCode= NativeMethods.RegCopyTree(source.Handle.DangerousGetHandle(),string.Empty,destination.Handle.DangerousGetHandle());
             if (returnCode !=0)
@@ -155,11 +176,22 @@ namespace PSRegistry
             }
             if (deleteSource)
             {
-
+                string sourceComputer = PSObject.AsPSObject(source).Members.Match("ComputerName")[0].Value as string;
+                if (null == sourceComputer)
+                {
+                    throw new ArgumentNullException("sourceComputer", "Unable to determine computer to delete key from.");
+                }
+                string baseKeyName=source.Name.Substring(0,source.Name.IndexOf(_RegPathSeparator));
+                string subKeyName=source.Name.Substring(source.Name.IndexOf(_RegPathSeparator)+1);
+                source.Dispose();
+                RegistryKey baseKey=RegistryKey.OpenRemoteBaseKey(hiveNameTable[baseKeyName],sourceComputer);
+                baseKey.DeleteSubKeyTree(subKeyName, true);
+                baseKey.Dispose();
             }
         }
-        
-        public static void CopyRegistryCommand(Cmdlet cmdlet, Dictionary<RegistryHive, List<string>> groupedRegKeysToProcess)
+
+        /// <summary>Method containing the core logic for the Copy-RegKey and Move-RegKey commands.</summary>
+        internal static void CopyRegistryCommand(Cmdlet cmdlet, Dictionary<RegistryHive, List<string>> groupedRegKeysToProcess)
         {
             string whatIfText        = "Will overwrite \"{0}\" with data from \"{1}\"";
             string confirmText       = "Overwrite \"{0}\" with data from \"{1}\"?";
@@ -170,31 +202,38 @@ namespace PSRegistry
             string[] computerName;
             RegistryView view;
             bool deleteSourceKey;
+            bool disposeKeys=true;
 
 
             if (cmdlet is CopyRegKeyCommand)
             {
-                var tempCmdlet          = cmdlet as CopyRegKeyCommand;
-                regKey                  = tempCmdlet.RegKey;
-                computerName            = tempCmdlet.ComputerName;
-                view                    = tempCmdlet.View;
-                deleteSourceKey         = false;
+                CopyRegKeyCommand tempCmdlet = cmdlet as CopyRegKeyCommand;
+                regKey                       = tempCmdlet.Key;
+                computerName                 = tempCmdlet.ComputerName;
+                view                         = tempCmdlet.View;
+                deleteSourceKey              = false;
+                if (tempCmdlet.DontDisposeKey)
+                {
+                    disposeKeys = false;
+                }
             }
             else
             {
                 whatIfText        = "Will move \"{1}\" to \"{0}\" - replacing any existing data.";
                 confirmText       = "Move \"{1}\" to \"{0}\" - replacing any existing data?";
                 whatIfTextNewKey  = "Will move \"{1}\" to \"{0}\"";
-                confirmTextNewKey = "Move \"{1}\" to \"{1}\"?";
+                confirmTextNewKey = "Move \"{1}\" to \"{0}\"?";
 
-                var tempCmdlet          = cmdlet as MoveRegKeyCommand;
-                regKey                  = tempCmdlet.RegKey;
-                computerName            = tempCmdlet.ComputerName;
-                view                    = tempCmdlet.View;
-                deleteSourceKey         = true;
+                MoveRegKeyCommand tempCmdlet = cmdlet as MoveRegKeyCommand;
+                regKey                       = tempCmdlet.Key;
+                computerName                 = new string[1] { tempCmdlet.ComputerName };
+                view                         = tempCmdlet.View;
+                deleteSourceKey              = true;
+                if (tempCmdlet.DontDisposeKey)
+                {
+                    disposeKeys = false;
+                }
             }
-            
-            
 
 
             foreach (string pcName in computerName)
@@ -215,33 +254,33 @@ namespace PSRegistry
 
                     foreach (string subKeyPath in groupedRegKeysToProcess[hive])
                     {
-                        //TODO: Get friendly hive name.
-                        string displayDestPath = $"{hive}\\{subKeyPath}";
+                        string displayDestPath = $"{hive}{_RegPathSeparator}{subKeyPath}";
                         string actualWhatIfText;
                         string actualConfirmText;
+                        RegistryKey destinationKey = null;
 
                         try
                         {
-                            var regRights = RegistryRights.CreateSubKey | RegistryRights.SetValue | RegistryRights.QueryValues;
-                            var destinationKey = baseKey.OpenSubKey(subKeyPath, RegistryKeyPermissionCheck.ReadWriteSubTree, regRights);
+                            RegistryRights regRights = RegistryRights.CreateSubKey | RegistryRights.SetValue | RegistryRights.QueryValues;
+                            destinationKey = baseKey.OpenSubKey(subKeyPath, RegistryKeyPermissionCheck.ReadWriteSubTree, regRights);
 
                             if (null == destinationKey)
                             {
                                 actualWhatIfText = string.Format(whatIfTextNewKey, displayDestPath, regKey.Name);
                                 actualConfirmText = string.Format(confirmTextNewKey, displayDestPath, regKey.Name);
-                                if (cmdlet.ShouldProcess(actualWhatIfText, actualConfirmText, "Confirm"))
+                                if (cmdlet.ShouldProcess(actualWhatIfText, actualConfirmText, _ConfirmPrompt))
                                 {
                                     destinationKey = baseKey.CreateSubKey(subKeyPath, RegistryKeyPermissionCheck.ReadWriteSubTree);
-                                    CopyRegistryKey(regKey, destinationKey,deleteSourceKey);
+                                    CopyRegistryKey(regKey, destinationKey, deleteSourceKey);
                                 }
                             }
                             else
                             {
                                 actualWhatIfText = string.Format(whatIfText, displayDestPath, regKey.Name);
                                 actualConfirmText = string.Format(confirmText, displayDestPath, regKey.Name);
-                                if (cmdlet.ShouldProcess(actualWhatIfText, actualConfirmText, "Confirm"))
+                                if (cmdlet.ShouldProcess(actualWhatIfText, actualConfirmText, _ConfirmPrompt))
                                 {
-                                    CopyRegistryKey(regKey, destinationKey,deleteSourceKey);
+                                    CopyRegistryKey(regKey, destinationKey, deleteSourceKey);
                                 }
                             }
                         }
@@ -249,9 +288,20 @@ namespace PSRegistry
                         {
                             cmdlet.WriteError(new ErrorRecord(e, "UnableToCopyKey", GetErrorCategory(e), regKey));
                         }
+                        finally
+                        {
+                            if (disposeKeys && null != destinationKey)
+                            {
+                                destinationKey.Dispose();
+                            }
+                        }
                     }
                     baseKey.Dispose();
                 }
+            }
+            if (disposeKeys)
+            {
+                regKey.Dispose();
             }
         }
     }

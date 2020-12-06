@@ -1,7 +1,7 @@
-﻿using System;
+﻿using Microsoft.Win32;
+using System;
 using System.Collections.Generic;
 using System.Management.Automation;
-using Microsoft.Win32;
 using System.Security.AccessControl;
 
 
@@ -15,23 +15,29 @@ namespace PSRegistry
         private Dictionary<RegistryHive, List<string>> _GroupedRegKeysToProcess;
 
         #region Parameters
+        /// <summary>The path to the registry key. This only supports the full path (HKLM:\System or HKEY_LOCAL_MACHINE\System)</summary>
         [Parameter(Position = 0, Mandatory = true)]
         [ValidateNotNullOrEmpty]
         public string[] Path { get; set; }
 
+        /// <summary>The computer to connect to. Default value is empty meaning that you are connecting to the local computer.</summary>
         [Parameter(Position = 1)]
         [Alias("PSComputerName")]
         public string[] ComputerName { get; set; } = new string[] { string.Empty };
 
+        /// <summary>Specifies whether security checks are performed when opening registry keys and accessing their name/value pairs.</summary>
         [Parameter()]
-        public RegistryKeyPermissionCheck RegPermissionCheck { get; set; } = RegistryKeyPermissionCheck.Default;
+        public RegistryKeyPermissionCheck KeyPermissionCheck { get; set; } = RegistryKeyPermissionCheck.Default;
 
+        /// <summary>The registry view to use.</summary>
         [Parameter()]
-        public RegistryView RegView { get; set; } = RegistryView.Default;
+        public RegistryView View { get; set; } = RegistryView.Default;
 
+        /// <summary>Specifies options such as if the key is volatile or not.</summary>
         [Parameter()]
-        public RegistryOptions RegOptions { get; set; } = RegistryOptions.None;
+        public RegistryOptions Options { get; set; } = RegistryOptions.None;
 
+        /// <summary>Specifies a custom ACL to apply to the new key.</summary>
         [Parameter()]
         public RegistrySecurity ACL { get; set; }
         #endregion
@@ -51,7 +57,7 @@ namespace PSRegistry
                     try
                     {
                         WriteVerbose($"{pcName}: Opening base key {hive}");
-                        baseKey = RegistryKey.OpenRemoteBaseKey(hive, pcName, RegView);
+                        baseKey = RegistryKey.OpenRemoteBaseKey(hive, pcName, View);
                     }
                     catch (Exception e) when (e is PipelineStoppedException == false)
                     {
@@ -62,7 +68,7 @@ namespace PSRegistry
                     {
                         if (subKeyPath == string.Empty)
                         {
-                            var e = new ArgumentException();
+                            ArgumentException e = new ArgumentException();
                             WriteError(new ErrorRecord(e, "EmptySubKeyPath", Utility.GetErrorCategory(e), subKeyPath));
                             continue;
                         }
@@ -71,11 +77,11 @@ namespace PSRegistry
                         {
                             if (ACL != null)
                             {
-                                newKey = baseKey.CreateSubKey(subKeyPath, RegPermissionCheck, RegOptions, ACL);
+                                newKey = baseKey.CreateSubKey(subKeyPath, KeyPermissionCheck, Options, ACL);
                             }
                             else
                             {
-                                newKey = baseKey.CreateSubKey(subKeyPath, RegPermissionCheck, RegOptions);
+                                newKey = baseKey.CreateSubKey(subKeyPath, KeyPermissionCheck, Options);
                             }
                         }
                         catch (Exception e) when (e is PipelineStoppedException == false)
@@ -86,7 +92,7 @@ namespace PSRegistry
 
                         if (newKey == null)
                         {
-                            var e = new ArgumentNullException();
+                            ArgumentNullException e = new ArgumentNullException();
                             WriteError(new ErrorRecord(e, "NewKeyWasNull", Utility.GetErrorCategory(e), subKeyPath));
                             continue;
                         }
