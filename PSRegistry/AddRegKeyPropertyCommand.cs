@@ -53,7 +53,7 @@ namespace PSRegistry
                 List<RegistryProperty> propertyList = new List<RegistryProperty>();
                 foreach (string item in Name)
                 {
-                    propertyList.Add(new RegistryProperty() { Name = item, Value = Value, Type = ValueKind });
+                    propertyList.Add(new RegistryProperty() { Name = item, Value = Value, ValueKind = ValueKind });
                 }
                 _RegistryPropertiesToSet = propertyList.ToArray();
             }
@@ -72,7 +72,7 @@ namespace PSRegistry
                     {
                         object valueToSet = property.Value;
 
-                        if (property.Type == RegistryValueKind.String || property.Type == RegistryValueKind.ExpandString)
+                        if (property.ValueKind == RegistryValueKind.String || property.ValueKind == RegistryValueKind.ExpandString)
                         {
                             if (null == valueToSet)
                             {
@@ -83,7 +83,7 @@ namespace PSRegistry
                                 valueToSet = valueToSet.ToString();
                             }
                         }
-                        else if (property.Type == RegistryValueKind.Binary)
+                        else if (property.ValueKind == RegistryValueKind.Binary)
                         {
                             if (null == valueToSet)
                             {
@@ -105,14 +105,14 @@ namespace PSRegistry
                                 }
                             }
                         }
-                        else if (property.Type == RegistryValueKind.DWord || property.Type == RegistryValueKind.QWord)
+                        else if (property.ValueKind == RegistryValueKind.DWord || property.ValueKind == RegistryValueKind.QWord)
                         {
                             if (null == valueToSet)
                             {
                                 valueToSet = 0;
                             }
                         }
-                        else if (property.Type == RegistryValueKind.MultiString)
+                        else if (property.ValueKind == RegistryValueKind.MultiString)
                         {
                             if (null == valueToSet)
                             {
@@ -147,7 +147,7 @@ namespace PSRegistry
                             }
                         }
 
-                        regKey.SetValue(property.Name, valueToSet, property.Type);
+                        regKey.SetValue(property.Name, valueToSet, property.ValueKind);
                     }
                     catch (Exception e) when (e is PipelineStoppedException == false)
                     {

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Configuration>
+  <ViewDefinitions>
+    <View>
+      <Name>RegKey</Name>
+      <ViewSelectedBy>
+        <TypeName>Microsoft.Win32.RegistryKey#PSRegistry</TypeName>
+      </ViewSelectedBy>
+      <TableControl>
+        <TableHeaders>
+
+          <TableColumnHeader>
+            <Width>12</Width>
+            <Label>ComputerName</Label>
+          </TableColumnHeader>
+
+          <TableColumnHeader>
+            <Width>20</Width>
+            <Label>Property</Label>
+          </TableColumnHeader>
+
+          <TableColumnHeader>
+            <Label>Name</Label>
+          </TableColumnHeader>
+
+        </TableHeaders>
+        <TableRowEntries>
+          <TableRowEntry>
+            <TableColumnItems>
+
+              <TableColumnItem>
+                <PropertyName>ComputerName</PropertyName>
+              </TableColumnItem>
+
+              <TableColumnItem>
+                <PropertyName>Property</PropertyName>
+              </TableColumnItem>
+
+              <TableColumnItem>
+                <PropertyName>Name</PropertyName>
+              </TableColumnItem>
+
+            </TableColumnItems>
+          </TableRowEntry>
+        </TableRowEntries>
+      </TableControl>
+    </View>
+  </ViewDefinitions>
+</Configuration>

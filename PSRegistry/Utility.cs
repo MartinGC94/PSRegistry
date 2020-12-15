@@ -116,7 +116,7 @@ namespace PSRegistry
                 {
                     valueKind = regKey.GetValueKind(valueNames[i]);
                 }
-                returnData[i] = new RegistryProperty() { Name = valueNames[i], Type = valueKind, Value = value };
+                returnData[i] = new RegistryProperty() { Name = valueNames[i], ValueKind = valueKind, Value = value };
             }
             return returnData;
         }
@@ -147,6 +147,7 @@ namespace PSRegistry
         internal static void WriteRegKeyToPipeline(Cmdlet cmdlet, RegistryKey regKey, string pcName, bool keyOnly, RegistryValueOptions valueOptions, bool includeValueKind)
         {
             PSObject objectToWrite = new PSObject(regKey);
+            objectToWrite.TypeNames.Insert(0, "Microsoft.Win32.RegistryKey#PSRegistry");
             objectToWrite.Members.Add(new PSNoteProperty("ComputerName", pcName), true);
 
             RegistryProperty[] registryProperties = new RegistryProperty[0];
@@ -254,7 +255,7 @@ namespace PSRegistry
 
                     foreach (string subKeyPath in groupedRegKeysToProcess[hive])
                     {
-                        string displayDestPath = $"{hive}{_RegPathSeparator}{subKeyPath}";
+                        string displayDestPath = $"{baseKey.Name}{_RegPathSeparator}{subKeyPath}";
                         string actualWhatIfText;
                         string actualConfirmText;
                         RegistryKey destinationKey = null;
@@ -290,7 +291,7 @@ namespace PSRegistry
                         }
                         finally
                         {
-                            if (disposeKeys && null != destinationKey)
+                            if (null != destinationKey)
                             {
                                 destinationKey.Dispose();
                             }

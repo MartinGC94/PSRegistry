@@ -1,5 +1,6 @@
 ﻿using Microsoft.Win32;
 using System;
+using System.Collections.Generic;
 using System.Management.Automation;
 using System.Security.AccessControl;
 
@@ -25,60 +26,61 @@ namespace PSRegistry
         /// <summary>Specifies if keys with subkeys can be deleted.</summary>
         [Parameter()]
         public SwitchParameter Recurse { get; set; }
+
+        /// <summary>The registry view to use.</summary>
+        [Parameter()]
+        public RegistryView View { get; set; } = RegistryView.Default;
         #endregion
         protected override void ProcessRecord()
         {
-            foreach (string PathString in Path)
+            Dictionary<RegistryHive, List<string>> groupedRegKeysToProcess = Utility.GroupKeyPathsByBaseKey(Path, this);
+            foreach (string pcName in ComputerName)
             {
-                string trimmedPathString = PathString.Trim(Utility._RegPathSeparator);
-                int indexOfLastSeparator = trimmedPathString.LastIndexOf(Utility._RegPathSeparator);
-                if (indexOfLastSeparator < 0)
+                foreach (RegistryHive hive in groupedRegKeysToProcess.Keys)
                 {
-                    //String looks like a basekey due to a lack of separators. Basekeys cannot be deleted.
-                    NotSupportedException e = new NotSupportedException();
-                    WriteError(new ErrorRecord(e, "UnableToDeleteBasekey", Utility.GetErrorCategory(e), PathString));
-                    continue;
-                }
-                string[] parentPath = new string[] { PathString.Substring(0, indexOfLastSeparator) };
-                string childPath = trimmedPathString.Substring(indexOfLastSeparator+1);
-
-                GetRegKeyCommand commandToRun = new GetRegKeyCommand()
-                {
-                    Path = parentPath,
-                    ComputerName = ComputerName,
-                    Rights = (RegistryRights.Delete | RegistryRights.EnumerateSubKeys | RegistryRights.QueryValues | RegistryRights.SetValue),
-                    KeyPermissionCheck= RegistryKeyPermissionCheck.ReadWriteSubTree,
-                    KeyOnly = true
-                };
-                System.Collections.IEnumerator commandOutput = commandToRun.Invoke().GetEnumerator();
-                while (commandOutput.MoveNext())
-                {
-                    RegistryKey key = (commandOutput.Current as PSObject).BaseObject as RegistryKey;
+                    RegistryKey baseKey;
                     try
                     {
-                        string actualWhatIfText  = string.Format(_WhatIfText,  $"{key.Name}{Utility._RegPathSeparator}{childPath}");
-                        string actualConfirmText = string.Format(_ConfirmText, $"{key.Name}{Utility._RegPathSeparator}{childPath}");
-
-                        if (ShouldProcess(actualWhatIfText, actualConfirmText, Utility._ConfirmPrompt))
-                        {
-                            if (Recurse)
-                            {
-                                key.DeleteSubKeyTree(childPath, true);
-                            }
-                            else
-                            {
-                                key.DeleteSubKey(childPath, true);
-                            }
-                        }
+                        WriteVerbose($"{pcName}: Opening base key {hive}");
+                        baseKey = RegistryKey.OpenRemoteBaseKey(hive, pcName, View);
                     }
                     catch (Exception e) when (e is PipelineStoppedException == false)
                     {
-                        WriteError(new ErrorRecord(e, "UnableToDeleteKey", Utility.GetErrorCategory(e), PathString));
+                        WriteError(new ErrorRecord(e, "UnableToOpenBaseKey", Utility.GetErrorCategory(e), pcName));
+                        continue;
                     }
-                    finally
+                    foreach (string subKeyPath in groupedRegKeysToProcess[hive])
                     {
-                        key.Dispose();
+                        if (subKeyPath == string.Empty)
+                        {
+                            NotSupportedException e = new NotSupportedException();
+                            WriteError(new ErrorRecord(e, "UnableToDeleteBasekey", Utility.GetErrorCategory(e), baseKey));
+                            continue;
+                        }
+                        string displayPath = $"{baseKey.Name}{Utility._RegPathSeparator}{subKeyPath}";
+                        string actualWhatIfText  = string.Format(_WhatIfText, displayPath);
+                        string actualConfirmText = string.Format(_ConfirmText, displayPath);
+
+                        try
+                        {
+                            if (ShouldProcess(actualWhatIfText, actualConfirmText, Utility._ConfirmPrompt))
+                            {
+                                if (Recurse)
+                                {
+                                    baseKey.DeleteSubKeyTree(subKeyPath, true);
+                                }
+                                else
+                                {
+                                    baseKey.DeleteSubKey(subKeyPath, true);
+                                }
+                            }
+                        }
+                        catch (Exception e) when (e is PipelineStoppedException == false)
+                        {
+                            WriteError(new ErrorRecord(e, "UnableToDeleteKey", Utility.GetErrorCategory(e), displayPath));
+                        }
                     }
+                    baseKey.Dispose();
                 }
             }
         }

@@ -11,7 +11,7 @@ namespace PSRegistry
     {
         public string Name { get; set; }
         public object Value { get; set; }
-        public RegistryValueKind Type { get; set; }
+        public RegistryValueKind ValueKind { get; set; }
     }
     internal sealed class RegKeyTransform : ArgumentTransformationAttribute
     {
@@ -67,7 +67,7 @@ namespace PSRegistry
             List<RegistryProperty> result = new List<RegistryProperty>();
             foreach (object key in inputDataAsHashtable.Keys)
             {
-                result.Add(new RegistryProperty() { Name = key.ToString(), Type = RegistryValueKind.Unknown, Value = inputDataAsHashtable[key] });
+                result.Add(new RegistryProperty() { Name = key.ToString(), ValueKind = RegistryValueKind.Unknown, Value = inputDataAsHashtable[key] });
             }
             return result.ToArray();
         }
