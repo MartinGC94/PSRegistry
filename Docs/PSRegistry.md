@@ -1,7 +1,7 @@
 ---
 Module Name: PSRegistry
 Module Guid: ea7fa35e-49f6-4594-a7e4-344984da0523
-Download Help Link: https://github.com/PowerShell/platyPS
+Download Help Link:
 Help Version: 1.0
 Locale: en-US
 ---
