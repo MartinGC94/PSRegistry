@@ -1,7 +1,7 @@
 ---
 external help file: PSRegistry.dll-Help.xml
 Module Name: PSRegistry
-online version: 1.0.0
+online version:
 schema: 2.0.0
 ---
 
@@ -24,7 +24,10 @@ Add-RegKeyProperty [-Key] <RegistryKey[]> -Property <RegistryProperty[]> [-DontD
 
 ## DESCRIPTION
 Add-RegKeyProperty is used to add new registry properties to registry keys.  
-If a key already has a property with the specified name it will be overwritten.
+If a key already has a property with the specified name it will be overwritten with no warning.  
+This cmdlet includes some conversion logic to convert the input type into the specified valuekind.  
+If no valuekind is specified, or it's set to "Unknown" it will try to guess the correct valuekind.  
+The conversion details can be found under the ValueKind parameter help.
 
 ## EXAMPLES
 
@@ -47,33 +50,36 @@ PS C:\> Add-RegKeyProperty -Key "HKEY_CURRENT_USER\Console" -Property @{
 ```
 
 Adds the 4 properties and values from the hashtable to to the "HKEY_CURRENT_USER\Console" key.  
-The first 3 properties will be added as Dword because the value is an integer.  
-The last property will be added as a String because the value is a string.
+The first 3 properties will be added as Dword because their value is an integer.  
+The last property will be added as a String because its value is a string.
 
 ### Example 3 Add multiple properties with objects that specify the valuekind
 ```powershell
 PS C:\> Add-RegKeyProperty -Key "HKEY_CURRENT_USER\Console" -Property @(
-    [PSRegistry.RegistryProperty]@{
-        Name      = "SomeBinaryValue"
-        Value     = @(0,0,1,1,0)
-        ValueKind = [Microsoft.Win32.RegistryValueKind]::Binary
-    }
-    [PSRegistry.RegistryProperty]@{
-        Name      = "SomeMultiStringValue"
-        Value     = @("String1","String2")
-        ValueKind = [Microsoft.Win32.RegistryValueKind]::MultiString
-    }
+    [PSRegistry.RegistryProperty]@{Name = "BinaryValue";       Value = "Hello"; ValueKind = [Microsoft.Win32.RegistryValueKind]::Binary}
+    [PSRegistry.RegistryProperty]@{Name = "MultiStringValue";  Value = "Hello"; ValueKind = [Microsoft.Win32.RegistryValueKind]::MultiString}
+    [PSRegistry.RegistryProperty]@{Name = "StringValue";       Value = "Hello"; ValueKind = [Microsoft.Win32.RegistryValueKind]::String}
+    [PSRegistry.RegistryProperty]@{Name = "DefaultValue";      Value = "Hello"; ValueKind = [Microsoft.Win32.RegistryValueKind]::Unknown}
+    [PSRegistry.RegistryProperty]@{Name = "DefaultValue2";     Value = "Hello"}
+    [PSRegistry.RegistryProperty]@{Name = "DefaultValue3"}
 )
 ```
+This example demonstrates how you can use the RegistryProperty object type to force specific value kinds when the automatic detection is insufficient.  
+In this example the string value will be converted to different types to match the valuekind, the conversion rules can be read under the ValueKind parameter.  
+Leaving out the ValueKind is the same as setting it to "Unknown". Leaving out the value and ValueKind will create an empty string property.
 
-Adds the 2 properties and values from the array to the "HKEY_CURRENT_USER\Console" key.  
-This can be used when multiple properties with different types have to be added to a key.
+### Example 4 Set the default value for a registry key
+```powershell
+PS C:\> Add-RegKeyProperty -Key "HKEY_CURRENT_USER\Console" -Name "" -Value Hello
+```
+This example demonstrates how to set the default value for a registry key. (The one Regedit shows as (default)).
 
 ## PARAMETERS
 
 ### -Key
 The registry keys where the properties should be added.  
-This can either be a string with the registry key path or it can be a Registry key object returned by Get-RegKey.
+This can either be strings containing the registry key path or Registry key objects returned by Get-RegKey.  
+If strings are provided the command will internally run Get-RegKey to get the registry keys with the minimum amount of permissions needed to change the property values.
 
 ```yaml
 Type: RegistryKey[]
@@ -122,26 +128,27 @@ The registry type (String, Dword, etc.) of the value that will be added. By defa
 
 String and ExpandStrings are handled like this:  
 Null = Empty string  
-Everything else = The result from the ToString method.
+Everything else = The result from the ToString method on the input object.
 
-Binary:  
+Binary and None:  
 Null = Empty byte array  
 String = The unicode representation of the string is converted to bytes.  
-Generic array = Each element is cast to int and then to byte.  
-Int = The int is cast to a byte and saved in a byte array.
+Int = The int is converted to a byte and saved in a single element byte array.  
+IList (lists and arrays) = Each element is converted to bytes.
 
 Dword or Qword:  
 Null = 0
 
 MultiString:  
 Null = Empty string array.  
-Generic array = The ToString method is run on every element.  
+String = Single element string array.
+IList (lists and arrays) = The ToString method is run on every element.  
 Everything else except string arrays = The ToString method is run on the object and put into a single element string array.
 
-Unknown or None:  
+Unknown:  
 Null = Empty String  
-Generic array where first element is an interger = Binary. (Every element is cast to int, then byte).  
-Generic array where first value is a string = MultiString value. (ToString is run on each element).
+IList (lists and arrays) where first element is a byte = Binary. (Every element is converted to byte).  
+IList (lists and arrays) where first element is a string = MultiString value. (ToString is run on each element).
 
 Every other scenario is handled automatically by the underlying [SetValue](https://docs.microsoft.com/en-us/dotnet/api/microsoft.win32.registrykey.setvalue) method.
 
@@ -159,7 +166,7 @@ Accept wildcard characters: False
 ```
 
 ### -Property
-The properties to add. This can either be a hashtable with the property names and values, or a [PSRegistry.RegistryProperty] object.
+The properties to add. This can either be a hashtable with the property names and values, or an array of [PSRegistry.RegistryProperty] objects.
 
 ```yaml
 Type: RegistryProperty[]

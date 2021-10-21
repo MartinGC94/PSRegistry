@@ -11,7 +11,7 @@ namespace PSRegistry
 
     public sealed class GetRegKeyCommand : Cmdlet
     {
-        private Dictionary<RegistryHive, List<string>> _GroupedRegKeysToProcess;
+        private Dictionary<RegistryHive, List<string>> groupedRegKeysToProcess;
 
         #region Parameters
         /// <summary>The path to the registry key. This only supports the full path (HKLM:\System or HKEY_LOCAL_MACHINE\System)</summary>
@@ -52,19 +52,22 @@ namespace PSRegistry
         /// <summary>Specifies optional behavior when retrieving name/value pairs from a registry key.</summary>
         [Parameter()]
         public RegistryValueOptions ValueOptions { get; set; } = RegistryValueOptions.None;
-        #endregion
 
+        /// <summary>Wraps the registry key in a PSObject for additional features.</summary>
+        [Parameter()]
+        internal bool AsPsObject { get; set; } = true;
+        #endregion
 
         protected override void BeginProcessing()
         {
-            _GroupedRegKeysToProcess = Utility.GroupKeyPathsByBaseKey(Path, this);
+            groupedRegKeysToProcess = Utility.GroupKeyPathsByBaseKey(Path, this);
         }
 
         protected override void ProcessRecord()
         {
             foreach (string pcName in ComputerName)
             {
-                foreach (RegistryHive hive in _GroupedRegKeysToProcess.Keys)
+                foreach (RegistryHive hive in groupedRegKeysToProcess.Keys)
                 {
                     RegistryKey baseKey;
                     try
@@ -78,7 +81,7 @@ namespace PSRegistry
                         continue;
                     }
                     bool shouldDisposeBaseKey = true;
-                    foreach (string subKeyPath in _GroupedRegKeysToProcess[hive])
+                    foreach (string subKeyPath in groupedRegKeysToProcess[hive])
                     {
                         RegistryKey subKey;
 
@@ -109,22 +112,22 @@ namespace PSRegistry
 
                         if (Recurse)
                         {
-                            int maxDepth= int.MaxValue;
-                            int startDepth = subKey.Name.Length - subKey.Name.Replace($"{Utility._RegPathSeparator}", string.Empty).Length;
+                            int maxDepth = int.MaxValue;
+                            int startDepth = subKey.Name.Length - subKey.Name.Replace($"{Utility.regPathSeparator}", string.Empty).Length;
                             //Ensures maxDepth doesn't exceed int max value
                             if (int.MaxValue - Depth - startDepth >= 0)
                             {
                                 maxDepth = Depth + startDepth;
                             }
 
-                            List<RegistryKey> subKeysToCheck = new List<RegistryKey>() {subKey };
+                            List<RegistryKey> subKeysToCheck = new List<RegistryKey>() {subKey};
                             do
                             {
                                 RegistryKey currentKey = subKeysToCheck[0];
                                 subKeysToCheck.RemoveAt(0);
 
-                                string[] foundSubKeyNames = new string[0];
-                                int currentDepth = currentKey.Name.Length - currentKey.Name.Replace($"{Utility._RegPathSeparator}", string.Empty).Length;
+                                string[] foundSubKeyNames = null;
+                                int currentDepth = currentKey.Name.Length - currentKey.Name.Replace($"{Utility.regPathSeparator}", string.Empty).Length;
                                 if (currentDepth < maxDepth)
                                 {
                                     try
@@ -147,12 +150,12 @@ namespace PSRegistry
                                         }
                                     }
                                 }
-                                Utility.WriteRegKeyToPipeline(this, currentKey, pcName, KeyOnly, ValueOptions, true);
+                                Utility.WriteRegKeyToPipeline(this, currentKey, pcName, KeyOnly, ValueOptions, includeValueKind:true, AsPsObject);
                             } while (subKeysToCheck.Count > 0);
                         }
                         else
                         {
-                            Utility.WriteRegKeyToPipeline(this, subKey, pcName, KeyOnly, ValueOptions, true);
+                            Utility.WriteRegKeyToPipeline(this, subKey, pcName, KeyOnly, ValueOptions, includeValueKind:true, AsPsObject);
                         }
                     }
                     if (shouldDisposeBaseKey)

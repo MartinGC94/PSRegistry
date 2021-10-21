@@ -10,8 +10,8 @@ namespace PSRegistry
 
     public sealed class MountRegHiveCommand : PSCmdlet
     {
-        private Dictionary<RegistryHive, List<string>> _GroupedRegKeysToProcess;
-        private bool _PrivWasPreviouslyEnabled;
+        private Dictionary<RegistryHive, List<string>> groupedRegKeysToProcess;
+        private bool privWasPreviouslyEnabled;
 
         #region Parameters
         /// <summary>The path to the registry database file that should be mounted.</summary>
@@ -37,8 +37,8 @@ namespace PSRegistry
 
         protected override void BeginProcessing()
         {
-            _GroupedRegKeysToProcess = Utility.GroupKeyPathsByBaseKey(new string[1] {DestinationPath}, this);
-            NativeMethods.RtlAdjustPrivilege((ulong)Utility.WindowsPrivileges.SeRestorePrivilege, true, false, out _PrivWasPreviouslyEnabled);
+            groupedRegKeysToProcess = Utility.GroupKeyPathsByBaseKey(new string[1] {DestinationPath}, this);
+            NativeMethods.RtlAdjustPrivilege(WindowsPrivileges.SeRestorePrivilege, Enable:true, CurrentThread:false, out privWasPreviouslyEnabled);
         }
 
         protected override void ProcessRecord()
@@ -49,15 +49,16 @@ namespace PSRegistry
             {
                 //Get file path for the file to mount, and the registry hive + subkey to mount it to.
                 filePath = GetUnresolvedProviderPathFromPSPath(Path);
-                Dictionary<RegistryHive, List<string>>.KeyCollection.Enumerator enumerator = _GroupedRegKeysToProcess.Keys.GetEnumerator();
-                enumerator.MoveNext();
-                RegistryHive mountHive = enumerator.Current;
-                string mountSubKey=_GroupedRegKeysToProcess[mountHive][0];
+                RegistryHive mountHive;
+                using (var enumerator = groupedRegKeysToProcess.Keys.GetEnumerator())
+                {
+                    _ = enumerator.MoveNext();
+                    mountHive = enumerator.Current;
+                }
+                string mountSubKey = groupedRegKeysToProcess[mountHive][0];
 
-
-                baseKey = RegistryKey.OpenRemoteBaseKey(mountHive, ComputerName,View);
-
-                int returnCode = NativeMethods.RegLoadKey(baseKey.Handle.DangerousGetHandle(), mountSubKey, filePath);
+                baseKey = RegistryKey.OpenRemoteBaseKey(mountHive, ComputerName, View);
+                int returnCode = NativeMethods.RegLoadKey(baseKey.Handle, mountSubKey, filePath);
                 if (returnCode != 0)
                 {
                     throw new Win32Exception(returnCode);
@@ -77,9 +78,9 @@ namespace PSRegistry
         }
         protected override void EndProcessing()
         {
-            if (!_PrivWasPreviouslyEnabled)
+            if (!privWasPreviouslyEnabled)
             {
-                NativeMethods.RtlAdjustPrivilege((ulong)Utility.WindowsPrivileges.SeRestorePrivilege, false, false, out _PrivWasPreviouslyEnabled);
+                NativeMethods.RtlAdjustPrivilege(WindowsPrivileges.SeRestorePrivilege, Enable:false, CurrentThread:false, out privWasPreviouslyEnabled);
             }
         }
     }

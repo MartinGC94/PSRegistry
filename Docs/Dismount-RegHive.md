@@ -1,7 +1,7 @@
 ---
 external help file: PSRegistry.dll-Help.xml
 Module Name: PSRegistry
-online version: 1.0.0
+online version:
 schema: 2.0.0
 ---
 

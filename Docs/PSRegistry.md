@@ -9,7 +9,7 @@ Locale: en-US
 # PSRegistry Module
 ## Description
 This module serves as an alternative to the registry provider included in Powershell that gives you more flexibility in how you access registry keys.  
-All of the included cmdlets include built-in remoting through the remote registry services.  
+Almost all of the included cmdlets include built-in remoting through the remote registry services.  
 For cmdlets without a ComputerName parameter you can use Get-RegKey to get a handle to a remote registry key that you can then pass into the cmdlets as needed.
 
 ## PSRegistry Cmdlets
@@ -35,5 +35,7 @@ Creates new registry keys.
 Deletes registry keys.
 
 ### [Remove-RegKeyProperty](Remove-RegKeyProperty.md)
-Deletes registry properties
+Deletes registry properties.
 
+### [Rename-RegKey](Rename-RegKey.md)
+Renames registry keys.

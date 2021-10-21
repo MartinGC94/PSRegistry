@@ -1,7 +1,7 @@
 ---
 external help file: PSRegistry.dll-Help.xml
 Module Name: PSRegistry
-online version: 1.0.0
+online version:
 schema: 2.0.0
 ---
 
@@ -13,7 +13,7 @@ Copies a registry key (with subkeys and values) to another key.
 ## SYNTAX
 
 ```
-Copy-RegKey [-Key] <RegistryKey> [-Destination] <String[]> [[-ComputerName] <String[]>] [-View <RegistryView>] [-DontDisposeKey] [-WhatIf] [-Confirm] [<CommonParameters>]
+Copy-RegKey [-Key] <RegistryKey> [-Destination] <String[]> [[-ComputerName] <String[]>] [-View <RegistryView>] [-DontDisposeKey] [-DestinationKeyRights <RegistryRights>] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -40,7 +40,8 @@ Copies the "HKCU:\Console" key from the local machine to "HKEY_USERS\.DEFAULT\Co
 
 ### -Key
 The registry key that should be copied.  
-This can either be a string with the registry key path or it can be a Registry key object returned by Get-RegKey.
+This can either be a string with the registry key path or it can be a Registry key object returned by Get-RegKey.  
+If a string is provided the command will internally run Get-RegKey to get the registry key with the minimum amount of permissions needed to copy a key + values and subkeys.
 
 ```yaml
 Type: RegistryKey
@@ -118,7 +119,21 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
+### -DestinationKeyRights
+Specifies the RegistryRights used to open the destination key.  
+If this is not set the command will use the same RegistryRights used to open the source key.
 
+```yaml
+Type: RegistryRights
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: Named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
 
 ### -Confirm
 Prompts you for confirmation before running the cmdlet.
@@ -134,8 +149,6 @@ Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
-
-
 
 ### -WhatIf
 Shows what would happen if the cmdlet runs.

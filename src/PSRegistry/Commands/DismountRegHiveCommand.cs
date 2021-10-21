@@ -10,8 +10,8 @@ namespace PSRegistry
 
     public sealed class DismountRegHiveCommand : Cmdlet
     {
-        private Dictionary<RegistryHive, List<string>> _GroupedRegKeysToProcess;
-        private bool _PrivWasPreviouslyEnabled;
+        private Dictionary<RegistryHive, List<string>> groupedRegKeysToProcess;
+        private bool privWasPreviouslyEnabled;
 
         #region Parameters
         /// <summary>The path to the registry key to dismount.</summary>
@@ -30,31 +30,31 @@ namespace PSRegistry
 
         protected override void BeginProcessing()
         {
-            _GroupedRegKeysToProcess = Utility.GroupKeyPathsByBaseKey(Path, this);
-            NativeMethods.RtlAdjustPrivilege((ulong)Utility.WindowsPrivileges.SeRestorePrivilege, true, false, out _PrivWasPreviouslyEnabled);
+            groupedRegKeysToProcess = Utility.GroupKeyPathsByBaseKey(Path, this);
+            NativeMethods.RtlAdjustPrivilege(WindowsPrivileges.SeRestorePrivilege, Enable:true, CurrentThread:false, out privWasPreviouslyEnabled);
         }
 
         protected override void ProcessRecord()
         {
             foreach (string pcName in ComputerName)
             {
-                foreach (RegistryHive hive in _GroupedRegKeysToProcess.Keys)
+                foreach (RegistryHive hive in groupedRegKeysToProcess.Keys)
                 {
                     RegistryKey baseKey = null;
                     try
                     {
-                        baseKey = RegistryKey.OpenRemoteBaseKey(hive, pcName,View);
+                        baseKey = RegistryKey.OpenRemoteBaseKey(hive, pcName, View);
                     }
                     catch (Exception e) when (e is PipelineStoppedException == false)
                     {
                         WriteError(new ErrorRecord(e, "UnableToOpenBaseKey", Utility.GetErrorCategory(e), pcName));
                         continue;
                     }
-                    foreach (string subKeyPath in _GroupedRegKeysToProcess[hive])
+                    foreach (string subKeyPath in groupedRegKeysToProcess[hive])
                     {
                         try
                         {
-                            int returnCode = NativeMethods.RegUnLoadKey(baseKey.Handle.DangerousGetHandle(), subKeyPath);
+                            int returnCode = NativeMethods.RegUnLoadKey(baseKey.Handle, subKeyPath);
                             if (returnCode != 0)
                             {
                                 throw new Win32Exception(returnCode);
@@ -71,9 +71,9 @@ namespace PSRegistry
         }
         protected override void EndProcessing()
         {
-            if (!_PrivWasPreviouslyEnabled)
+            if (!privWasPreviouslyEnabled)
             {
-                NativeMethods.RtlAdjustPrivilege((ulong)Utility.WindowsPrivileges.SeRestorePrivilege, false, false, out _PrivWasPreviouslyEnabled);
+                NativeMethods.RtlAdjustPrivilege(WindowsPrivileges.SeRestorePrivilege, Enable:false, CurrentThread:false, out privWasPreviouslyEnabled);
             }
         }
     }

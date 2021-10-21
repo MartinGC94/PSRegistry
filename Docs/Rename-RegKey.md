@@ -5,61 +5,52 @@ online version:
 schema: 2.0.0
 ---
 
-# Remove-RegKeyProperty
+# Rename-RegKey
 
 ## SYNOPSIS
-Deletes registry properties
+Renames registry keys.
 
 ## SYNTAX
 
 ```
-Remove-RegKeyProperty [-Key] <RegistryKey[]> [-PropertyName] <String[]> [-DontDisposeKey] [-WhatIf] [-Confirm] [<CommonParameters>]
+Rename-RegKey [-Path] <string[]> [-NewName] <string> [-View <RegistryView>] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
-The Remove-RegKeyProperty cmdlet deletes registry key properties.
+The Rename-RegKey cmdlet renames registry keys using the [RegRenameKey](https://docs.microsoft.com/en-us/windows/win32/api/winreg/nf-winreg-regrenamekey) function from winreg.h.  
+If a key with the NewName already exists the command will fail.
 
 ## EXAMPLES
 
-### Example 1 Remove a property from a key.
+### Example 1 Rename a single key
 ```powershell
-PS C:\> Remove-RegKeyProperty -Key HKEY_CURRENT_USER\SomeKey -PropertyName "SomeProperty"
+PS C:\> Rename-RegKey -Path 'HKEY_CURRENT_USER\Console\Demokey1' -NewName 'DemoKey2'
 ```
-
-Removes the "SomeProperty" property from "HKEY_CURRENT_USER\SomeKey".
-
-### Example 2 Remove the default property for a key.
-```powershell
-PS C:\> Remove-RegKeyProperty -Key HKEY_CURRENT_USER\SomeKey -PropertyName ""
-```
-
-Removes the default property from "HKEY_CURRENT_USER\SomeKey".
 
 ## PARAMETERS
 
-### -Key
-The registry keys where the properties should be removed.  
-This can either be a string with the registry key path or it can be a Registry key object returned by Get-RegKey.
-
-```yaml
-Type: RegistryKey[]
-Parameter Sets: (All)
-Aliases:
-
-Required: True
-Position: 0
-Default value: None
-Accept pipeline input: True (ByValue)
-Accept wildcard characters: False
-```
-
-### -PropertyName
-The properties to remove.
+### -Path
+Specifies the full path to the registry key that should be renamed.
 
 ```yaml
 Type: String[]
 Parameter Sets: (All)
 Aliases: Name
+
+Required: True
+Position: 0
+Default value: None
+Accept pipeline input: True
+Accept wildcard characters: False
+```
+
+### -NewName
+Specifies the new name for the registry key.
+
+```yaml
+Type: String
+Parameter Sets: (All)
+Aliases:
 
 Required: True
 Position: 1
@@ -68,22 +59,22 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -DontDisposeKey
-Specifies that the registrykey should not be disposed after the properties have been deleted.  
-This is useful when you need to do multiple operations on a registry key and plan on manually disposing it when done.
+### -View
+Specifies the registry view to target.  
+This allows you view the registry like a 32-bit application would on a 64-bit OS.
 
 ```yaml
-Type: SwitchParameter
+Type: RegistryView
 Parameter Sets: (All)
-Aliases: DontCloseKey, NoDispose
+Aliases:
+Accepted values: Default, Registry64, Registry32
 
 Required: False
 Position: Named
-Default value: None
+Default value: Default
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
-
 
 
 ### -Confirm
@@ -100,7 +91,6 @@ Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
-
 
 ### -WhatIf
 Shows what would happen if the cmdlet runs.
@@ -123,11 +113,12 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## INPUTS
 
-### Microsoft.Win32.RegistryKey[]
+### System.String[]
 
 ## OUTPUTS
 
 ### None
+
 ## NOTES
 
 ## RELATED LINKS

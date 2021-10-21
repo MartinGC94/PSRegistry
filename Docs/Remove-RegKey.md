@@ -1,7 +1,7 @@
 ---
 external help file: PSRegistry.dll-Help.xml
 Module Name: PSRegistry
-online version: 1.0.0
+online version:
 schema: 2.0.0
 ---
 
@@ -109,9 +109,6 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-
-
-
 ### -WhatIf
 Shows what would happen if the cmdlet runs.
 The cmdlet is not run.
@@ -138,6 +135,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 ## OUTPUTS
 
 ### None
+
 ## NOTES
 
 ## RELATED LINKS

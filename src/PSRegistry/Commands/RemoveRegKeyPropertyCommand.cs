@@ -8,13 +8,13 @@ namespace PSRegistry
 
     public sealed class RemoveRegKeyPropertyCommand : Cmdlet
     {
-        private const string _WhatIfText = "Will delete \"{0}\" property from \"{1}\"";
-        private const string _ConfirmText = "Delete \"{0}\" property from \"{1}\"?";
+        private const string whatIfText = "Will delete \"{0}\" property from \"{1}\"";
+        private const string confirmText = "Delete \"{0}\" property from \"{1}\"?";
 
         #region Parameters
         /// <summary>The registry key(s) where the properties should be deleted from..</summary>
         [Parameter(Position = 0, Mandatory = true, ValueFromPipeline = true)]
-        [RegKeyTransform]
+        [RegKeyAddRemovePropertyTransform]
         [ValidateNotNullOrEmpty]
         public RegistryKey[] Key { get; set; }
 
@@ -37,7 +37,7 @@ namespace PSRegistry
                 {
                     try
                     {
-                        if (ShouldProcess(string.Format(_WhatIfText, name, regKey.Name), string.Format(_ConfirmText, name, regKey.Name), Utility._ConfirmPrompt))
+                        if (ShouldProcess(string.Format(whatIfText, name, regKey.Name), string.Format(confirmText, name, regKey.Name), Utility.confirmPrompt))
                         {
                             regKey.DeleteValue(name, true);
                         }

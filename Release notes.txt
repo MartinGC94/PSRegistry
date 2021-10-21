@@ -1,2 +1,18 @@
+2.0.0:
+    cmdlet changes:
+        New cmdlet: Rename-RegKey
+        Modified cmdlet: Get-RegKey - The "Property" property has been renamed to "Properties" in the output and the type is now a Dictionary instead of an array.
+        Modified cmdlet: Add-RegKeyProperty - The conversion logic has been modified to take PSObjects into account and now supports any collection type that implements IList.
+        Modified cmdlet: Copy-RegKey - New "DestinationKeyRights" parameter to explicitly set the RegistryRights if needed. Default behavior is now to use the same RegistryRights used to open the source key.
+    Error changes:
+        Error categories that were previously "NotSpecified" will now be more specific.
+        Some exceptions have been updated with more helpful descriptions.
+    Compatibility changes:
+        The module now supports Powershell 7+
+        The minimum .NET framework version has been lowered to 4.6.2 to match the inbox version of Windows Server 2016.
+    Other changes:
+        Argument transformers have been updated to be more lenient in input types. The RegKey transformers have been updated to use as few permissions as possible for each command.
+        The RegistryProperty type has been updated with a new ToString method that shows the valuekind and value.
+        Help files have been updated with more examples.
 1.0.0.0:
 Initial release

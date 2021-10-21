@@ -12,7 +12,7 @@ namespace PSRegistry
 
     public sealed class NewRegKeyCommand : Cmdlet
     {
-        private Dictionary<RegistryHive, List<string>> _GroupedRegKeysToProcess;
+        private Dictionary<RegistryHive, List<string>> groupedRegKeysToProcess;
 
         #region Parameters
         /// <summary>The path to the registry key. This only supports the full path (HKLM:\System or HKEY_LOCAL_MACHINE\System)</summary>
@@ -44,14 +44,14 @@ namespace PSRegistry
 
         protected override void BeginProcessing()
         {
-            _GroupedRegKeysToProcess = Utility.GroupKeyPathsByBaseKey(Path, this);
+            groupedRegKeysToProcess = Utility.GroupKeyPathsByBaseKey(Path, this);
         }
 
         protected override void ProcessRecord()
         {
             foreach (string pcName in ComputerName)
             {
-                foreach (RegistryHive hive in _GroupedRegKeysToProcess.Keys)
+                foreach (RegistryHive hive in groupedRegKeysToProcess.Keys)
                 {
                     RegistryKey baseKey;
                     try
@@ -64,24 +64,24 @@ namespace PSRegistry
                         WriteError(new ErrorRecord(e, "UnableToOpenBaseKey", Utility.GetErrorCategory(e), pcName));
                         continue;
                     }
-                    foreach (string subKeyPath in _GroupedRegKeysToProcess[hive])
+                    foreach (string subKeyPath in groupedRegKeysToProcess[hive])
                     {
                         if (subKeyPath == string.Empty)
                         {
-                            ArgumentException e = new ArgumentException();
+                            var e = new ArgumentException($"The subkey path is empty. This command cannot create registry hives such as {hive}.");
                             WriteError(new ErrorRecord(e, "EmptySubKeyPath", Utility.GetErrorCategory(e), subKeyPath));
                             continue;
                         }
                         RegistryKey newKey;
                         try
                         {
-                            if (ACL != null)
+                            if (ACL is null)
                             {
-                                newKey = baseKey.CreateSubKey(subKeyPath, KeyPermissionCheck, Options, ACL);
+                                newKey = baseKey.CreateSubKey(subKeyPath, KeyPermissionCheck, Options);
                             }
                             else
                             {
-                                newKey = baseKey.CreateSubKey(subKeyPath, KeyPermissionCheck, Options);
+                                newKey = baseKey.CreateSubKey(subKeyPath, KeyPermissionCheck, Options, ACL);
                             }
                         }
                         catch (Exception e) when (e is PipelineStoppedException == false)
@@ -97,7 +97,7 @@ namespace PSRegistry
                             continue;
                         }
 
-                        Utility.WriteRegKeyToPipeline(this, newKey, pcName, true, RegistryValueOptions.None, false);
+                        Utility.WriteRegKeyToPipeline(this, newKey, pcName, keyOnly:true, RegistryValueOptions.None, includeValueKind:false, asPsObject:true);
                     }
                     baseKey.Dispose();
                 }

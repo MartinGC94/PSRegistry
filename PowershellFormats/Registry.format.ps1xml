@@ -16,7 +16,7 @@
 
           <TableColumnHeader>
             <Width>20</Width>
-            <Label>Property</Label>
+            <Label>Properties</Label>
           </TableColumnHeader>
 
           <TableColumnHeader>
@@ -33,7 +33,7 @@
               </TableColumnItem>
 
               <TableColumnItem>
-                <PropertyName>Property</PropertyName>
+                <PropertyName>Properties</PropertyName>
               </TableColumnItem>
 
               <TableColumnItem>

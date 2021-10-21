@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Management.Automation;
-using System.Security.AccessControl;
 
 namespace PSRegistry
 {
@@ -10,8 +9,8 @@ namespace PSRegistry
 
     public sealed class RemoveRegKeyCommand : Cmdlet
     {
-        private const string _WhatIfText  = "Will delete key: \"{0}\"";
-        private const string _ConfirmText = "Delete key: \"{0}\"?";
+        private const string whatIfText  = "Will delete key: \"{0}\"";
+        private const string confirmText = "Delete key: \"{0}\"?";
 
         #region Parameters
         /// <summary>The path to the registry key. This only supports the full path (HKLM:\System or HKEY_LOCAL_MACHINE\System)</summary>
@@ -53,17 +52,17 @@ namespace PSRegistry
                     {
                         if (subKeyPath == string.Empty)
                         {
-                            NotSupportedException e = new NotSupportedException();
+                            var e = new ArgumentException($"The subkey path is empty. This command cannot delete registry hives such as {hive}.");
                             WriteError(new ErrorRecord(e, "UnableToDeleteBasekey", Utility.GetErrorCategory(e), baseKey));
                             continue;
                         }
-                        string displayPath = $"{baseKey.Name}{Utility._RegPathSeparator}{subKeyPath}";
-                        string actualWhatIfText  = string.Format(_WhatIfText, displayPath);
-                        string actualConfirmText = string.Format(_ConfirmText, displayPath);
+                        string displayPath = $"{baseKey.Name}{Utility.regPathSeparator}{subKeyPath}";
+                        string actualWhatIfText  = string.Format(whatIfText, displayPath);
+                        string actualConfirmText = string.Format(confirmText, displayPath);
 
                         try
                         {
-                            if (ShouldProcess(actualWhatIfText, actualConfirmText, Utility._ConfirmPrompt))
+                            if (ShouldProcess(actualWhatIfText, actualConfirmText, Utility.confirmPrompt))
                             {
                                 if (Recurse)
                                 {

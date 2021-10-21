@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+﻿#Requires -Version 5.1 -Modules platyPS
 
 [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
 param
@@ -7,62 +7,65 @@ param
     [Alias("ModuleVersion")]
     [version]$Version,
 
+    [Parameter()]
     [string]$Destination = "$PSScriptRoot\Releases",
 
     [Parameter()]
     [Validateset("Release","Debug")]
-    [string]$Configuration="Release"
+    [string]$Configuration = "Release"
 
 )
-
-#region import module data
-$ModuleData = Import-PowerShellDataFile -Path "$PSScriptRoot\ModuleData.psd1"
-
-$ModuleName     = $ModuleData["ModuleName"]
-$ModuleManifest = $ModuleData["ManifestData"]
-$RootModuleName = $ModuleManifest["RootModule"]
-
-$ModuleManifest.Add("ReleaseNotes", (Get-Content -Path "$PSScriptRoot\Release Notes.txt" -Raw -Encoding Default))
-$ModuleManifest.Add("ModuleVersion", $Version)
-#endregion
-
+$ModuleName="PSRegistry"
 
 #region Create destination folder and make sure it is empty
 $DestinationDirectory = [System.IO.Path]::Combine($Destination, $ModuleName, $Version)
-[void](New-Item -Path $DestinationDirectory -ItemType Directory -Force)
+$null = New-Item -Path $DestinationDirectory -ItemType Directory -Force
 
-$ItemsToRemove = Get-ChildItem -Path $DestinationDirectory
+$ItemsToRemove = Get-ChildItem -LiteralPath $DestinationDirectory -Force
 if ($ItemsToRemove -and $PSCmdlet.ShouldProcess($DestinationDirectory, "Deleting $($ItemsToRemove.Count) item(s)"))
 {
     Remove-Item -LiteralPath $ItemsToRemove.FullName -Recurse -Force
 }
 #endregion
 
-#region update assembly version info
-$AssemblyInfoFile=Get-ChildItem -Path $PSScriptRoot\$ModuleName -Filter AssemblyInfo.cs -Recurse -File | Select-Object -First 1
-[string[]]$Content=Get-Content -LiteralPath $AssemblyInfoFile.FullName -Encoding UTF8
+#region Compile and add all content to destination folder
+MSBuild.exe "$PSScriptRoot\$ModuleName.sln" "-property:Configuration=$Configuration,Version=$Version"
 
-$Line=Select-String -LiteralPath $AssemblyInfoFile.FullName -Pattern '^\[assembly: AssemblyVersion\(\"[0-9]\.'
-$Content[$Line.LineNumber-1]="[assembly: AssemblyVersion(`"$($Version.ToString())`")]"
-$Line=Select-String -LiteralPath $AssemblyInfoFile.FullName -Pattern '^\[assembly: AssemblyFileVersion\(\"[0-9]\.'
-$Content[$Line.LineNumber-1]="[assembly: AssemblyFileVersion(`"$($Version.ToString())`")]"
+$CompiledFiles = Get-ChildItem -Path "$PSScriptRoot\src\PSRegistry\bin\*\$Configuration" -Recurse -Filter "$ModuleName.dll"
 
-Set-Content -Value $Content -LiteralPath $AssemblyInfoFile.FullName -Encoding UTF8
+$FileToImport = $CompiledFiles | Where-Object -Property FullName -Like "$PSScriptRoot\*\$PSEdition\*" | Select-Object -First 1
+$ModuleInfo = Import-Module -Name $FileToImport.FullName -PassThru
+$CmdletsToExport = $ModuleInfo.ExportedCmdlets.Keys.ForEach({"'$_'"}) -join ','
+Remove-Module -ModuleInfo $ModuleInfo
+
+Copy-Item -LiteralPath $CompiledFiles.DirectoryName -Destination $DestinationDirectory -Recurse -Container -Force -Filter "$ModuleName.dll"
+Copy-Item -Path "$PSScriptRoot\PowershellFormats\*" -Destination $DestinationDirectory -Force
+Copy-Item -LiteralPath "$PSScriptRoot\ModuleManifest.psd1" -Destination "$DestinationDirectory\$ModuleName.psd1"
+
+$HelpFile = New-ExternalHelp -Path $PSScriptRoot\Docs -OutputPath $DestinationDirectory\en-US
+[xml]$HelpContent = Get-Content -LiteralPath $HelpFile.FullName -Raw
+$HelpExamples = Select-Xml -Xml $HelpContent.helpItems -XPath //command:example -Namespace @{command = "http://schemas.microsoft.com/maml/dev/command/2004/10"}
+foreach ($Example in $HelpExamples)
+{
+    for ($i = 0; $i -lt 2; $i++)
+    {
+        $Element = $HelpContent.CreateElement('maml', 'para', 'http://schemas.microsoft.com/maml/2004/10')
+        $null = $Example.Node.remarks.AppendChild($Element)
+    }
+}
+$HelpContent.Save($HelpFile.FullName)
 #endregion
 
+#region update module manifest
+$FileList = (Get-ChildItem -LiteralPath $DestinationDirectory -File -Recurse | ForEach-Object -Process {
+    "'$($_.FullName.Replace("$DestinationDirectory\", ''))'"
+}) -join ','
+$ReleaseNotes = Get-Content -LiteralPath "$PSScriptRoot\Release notes.txt" -Raw
 
-MSBuild.exe $PSScriptRoot\$ModuleName.sln /property:Configuration=$Configuration
-
-
-#region Add all module content to $DestinationDirectory
-Copy-Item -Path "$PSScriptRoot\$ModuleName\bin\$Configuration\$ModuleName.dll" -Destination $DestinationDirectory
-
-$FormatFiles=Get-ChildItem -Path "$PSScriptRoot\PowershellFormats" -File
-Copy-Item -Path $FormatFiles.FullName -Destination $DestinationDirectory
-
-New-ModuleManifest @ModuleManifest -Path "$DestinationDirectory\$ModuleName.psd1" -FormatsToProcess $FormatFiles.Name
-New-ExternalHelp -Path $PSScriptRoot\Docs -OutputPath $DestinationDirectory
-
-$FilesInModule = Get-ChildItem -Path $DestinationDirectory -Recurse -File -Force
-Update-ModuleManifest -Path "$DestinationDirectory\$ModuleName.psd1" -FileList $FilesInModule.FullName.Replace("$DestinationDirectory\", '')
+((Get-Content -LiteralPath "$PSScriptRoot\ModuleManifest.psd1" -Raw) -replace '{(?=[^\d])','{{' -replace '(?<!\d)}','}}') -f @(
+    "'$Version'"
+    $CmdletsToExport
+    $FileList
+    $ReleaseNotes
+) | Set-Content -LiteralPath "$DestinationDirectory\$ModuleName.psd1" -Force
 #endregion
