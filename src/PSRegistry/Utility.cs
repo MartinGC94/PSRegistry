@@ -271,6 +271,58 @@ namespace PSRegistry
             return property;
         }
 
+        internal static byte[] GetUwpValueBytesFromObject(object inputValue, DateTime timeStamp, out PsRegistryValueKind valueKind)
+        {
+            object unwrappedValue = inputValue is PSObject psObject
+                ? psObject.BaseObject
+                : inputValue;
+
+            byte[] valueData;
+            switch (unwrappedValue)
+            {
+                case int valAsInt:
+                    valueKind = PsRegistryValueKind.UwpInt32;
+                    valueData = BitConverter.GetBytes(valAsInt);
+                    break;
+
+                case uint valAsUint:
+                    valueKind = PsRegistryValueKind.UwpUint32;
+                    valueData = BitConverter.GetBytes(valAsUint);
+                    break;
+
+                case bool valAsBool:
+                    valueKind = PsRegistryValueKind.UwpBool;
+                    valueData = BitConverter.GetBytes(valAsBool);
+                    break;
+
+                case SwitchParameter valAsSwitch:
+                    valueKind = PsRegistryValueKind.UwpBool;
+                    valueData = BitConverter.GetBytes((bool)valAsSwitch);
+                    break;
+
+                case string valAsString:
+                    valueKind = PsRegistryValueKind.UwpString;
+                    valueData = Encoding.Unicode.GetBytes(valAsString);
+                    break;
+
+                case byte[] valAsByteArray:
+                    valueKind = PsRegistryValueKind.REG_NONE;
+                    valueData = valAsByteArray;
+                    break;
+
+                default:
+                    throw new ArgumentException("Value has an unsupported type.");
+            }
+
+            byte[] timeStampData = BitConverter.GetBytes(timeStamp.ToFileTime());
+
+            var output = new byte[valueData.Length + timeStampData.Length];
+            Array.Copy(valueData, output, valueData.Length);
+            Array.Copy(timeStampData, 0, output, valueData.Length, timeStampData.Length);
+
+            return output;
+        }
+
         /// <summary>Writes registrykey objects to the pipeline and optionally wraps them as PSObjects with additional members.</summary>
         internal static void WriteRegKeyToPipeline(Cmdlet cmdlet, RegistryKey regKey, string pcName, bool keyOnly, RegistryValueOptions valueOptions, bool includeValueKind, bool asPsObject)
         {

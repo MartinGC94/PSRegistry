@@ -7,7 +7,7 @@ using System.Management.Automation;
 namespace PSRegistry
 {
     [Cmdlet(VerbsCommon.Add, "RegKeyProperty", DefaultParameterSetName = fromNameParamSet)]
-
+    [Alias("Set-RegKeyProperty")]
     public sealed class AddRegKeyPropertyCommand : Cmdlet
     {
         private const string fromNameParamSet   = "FromName";

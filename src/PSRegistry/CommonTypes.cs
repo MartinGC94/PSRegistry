@@ -1,4 +1,5 @@
 ﻿using Microsoft.Win32;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Management.Automation;
@@ -45,6 +46,28 @@ namespace PSRegistry
             return result.ToArray();
         }
     }
+
+    internal sealed class RegUwpPropertyTransform : ArgumentTransformationAttribute
+    {
+        public override object Transform(EngineIntrinsics engineIntrinsics, object inputData)
+        {
+            if (!(inputData is IDictionary inputDataAsDictionary))
+            {
+                return inputData;
+            }
+
+            var result = new List<UwpRegistryProperty>(inputDataAsDictionary.Count);
+            foreach (object key in inputDataAsDictionary.Keys)
+            {
+                string name = key.ToString();
+                object value = inputDataAsDictionary[key];
+                UwpRegistryProperty property = new UwpRegistryProperty(name, value);
+                result.Add(property);
+            }
+
+            return result.ToArray();
+        }
+    }
     #endregion
     #region Classes
     /// <summary>Object for registry properties returned by Get-RegKey and a parameter for Add-RegKeyProperty .</summary>
@@ -58,8 +81,90 @@ namespace PSRegistry
             return $"{ValueKind}: {Value}";
         }
     }
+
+    public sealed class UwpRegistryProperty
+    {
+        public string Name { get; }
+        public object Value { get; }
+        public DateTime TimeStamp { get; }
+        public PsRegistryValueKind ValueKind { get; }
+
+        internal UwpRegistryProperty(string name, object value)
+        {
+            object unwrappedValue = value is PSObject psObject
+                ? psObject.BaseObject
+                : value;
+
+            PsRegistryValueKind valueKind;
+            switch (value)
+            {
+                case int _:
+                    valueKind = PsRegistryValueKind.UwpInt32;
+                    break;
+
+                case uint _:
+                    valueKind = PsRegistryValueKind.UwpUint32;
+                    break;
+
+                case bool _:
+                    valueKind = PsRegistryValueKind.UwpBool;
+                    break;
+
+                case string _:
+                    valueKind = PsRegistryValueKind.UwpString;
+                    break;
+
+                default:
+                    throw new ArgumentException("Unsupported value type. Add the property as a raw value instead.");
+            }
+
+            Name = name;
+            Value = unwrappedValue;
+            TimeStamp = DateTime.Now;
+            ValueKind = valueKind;
+        }
+
+        internal UwpRegistryProperty(string name, object value, DateTime timeStamp, PsRegistryValueKind valueKind)
+        {
+            Name = name;
+            Value = value;
+            TimeStamp = timeStamp;
+            ValueKind = valueKind;
+        }
+    }
+
+    public sealed class RawUwpRegistryProperty
+    {
+        public string Name { get; }
+        public byte[] Value { get; }
+        public PsRegistryValueKind ValueKind { get; }
+
+        internal RawUwpRegistryProperty(string name, byte[] value, PsRegistryValueKind valueKind)
+        {
+            Name = name;
+            Value = value;
+            ValueKind = valueKind;
+        }
+    }
+
     #endregion
     #region Enums
+
+    public enum PsRegistryValueKind : uint
+    {
+        REG_NONE = 0,
+        REG_SZ = 1,
+        REG_EXPAND_SZ = 2,
+        REG_BINARY = 3,
+        REG_DWORD = 4,
+        REG_MULTI_SZ = 7,
+        REG_QWORD = 11,
+        UwpInt32 = 100000004,
+        UwpUint32 = 100000005,
+        UwpBool = 100000011,
+        UwpString = 100000012
+    }
+
     /// <summary>Enum for all the different windows privileges that can be enabled.</summary>
     internal enum WindowsPrivileges : ulong
     {

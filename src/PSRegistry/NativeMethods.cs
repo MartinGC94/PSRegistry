@@ -49,5 +49,24 @@ namespace PSRegistry
             [In] uint informationLength,
             [Out] out uint returnLength
         );
+
+        [DllImport("advapi32.dll", ExactSpelling = true, CharSet = CharSet.Unicode)]
+        internal static extern int RegGetValueW(
+            SafeRegistryHandle hkey,
+            string lpSubKey,
+            string lpValue,
+            uint dwFlags,
+            out PsRegistryValueKind pdwType,
+            byte[] pvData,
+            ref int pcbData);
+
+        [DllImport("advapi32.dll", ExactSpelling = true, CharSet = CharSet.Unicode)]
+        internal static extern int RegSetKeyValueW(
+            SafeRegistryHandle hkey,
+            string lpSubKey,
+            string lpValueName,
+            PsRegistryValueKind dwType,
+            byte[] lpData,
+            int cbData);
     }
 }
