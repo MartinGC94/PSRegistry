@@ -1,3 +1,39 @@
+3.0.0:
+    Full module rewrite with various breaking changes.
+    Made it possible to read/write the registry properties for packaged apps.
+    Error messages in general have been improved to better explain where in the process something failed.
+    Removed the ability to access the HKEY_PERFORMANCE_DATA registry hive.
+    Get-RegKey:
+        Removed the parameters KeyOnly, ValueOptions.
+        When using -Recurse, the specified input key will no longer be output.
+            So "Get-RegKey HKCU:\Test -Recurse" will output subkeys, but not "HKCU:\Test" itself.
+            This mirrors the behavior of Get-ChildItem.
+        Registry searches will be done in the input order, rather than being grouped by the registry hive.
+            So "Get-RegKey HKCU:\Test, HKLM:\Test, HKCU:\Test2" will output the keys in that exact order.
+        If neither of the parameters KeyPermissionCheck, and Rights are specified, the command will try to open keys with ReadWriteSubTree, and FullControl with a fallback to readonly permissions.
+        The Properties property on the output objects is a CodeProperty, rather than a Noteproperty.
+            This means that the properties are retrived dynamically whenever the Properties property is accessed.
+        Added the LastWriteTime property to the object, making it possible to see the last time a registry key was modified.
+        Added a GetProperty method to the object which makes it possible to get a single property by name, instead of getting them all from Properties.
+    Dismount-RegHive:
+        The Path and ComputerName parameter types were changed from string[] to string.
+    Add-RegKeyProperty:
+        The command was renamed to Set-RegKeyProperty, and an alias to the old Add-RegKeyProperty name was added to the command.
+        The logic used for the automatic conversion of values to user specified registry types and the automatic detection of registry types have been simplified.
+            The conversion now uses the PowerShell conversion logic for the most part, which means some objects that couldn't previously be converted now can, and vice versa.
+        Added new RawValue property which makes it possible to write a byte array directly to a registry property, bypassing any value conversion this command would otherwise do.
+        The ValueKind parameter type was changed from Microsoft.Win32.RegistryValueKind to MartinGC94.PSRegistry.API.RegistryValueType.
+        Added new UwpProperty parameter which is completely identical to the Property parameter, except when using the argument transformer feature.
+            When converting an input value, the target type is assumed to be UWP, so a string value for example would be treated as UwpString (100000012) rather than string (1).
+        When creating a new property without providing a value or ValueKind, the resulting property will have a registry type of None, rather than String.
+    Copy-RegKey:
+        The command was removed because the underlying API (RegCopyTree) is kinda broken.
+        Both the source and destination needs to be opened with the same registry rights, but this obviously doesn't work when copying a key that is only accessible with Read-Only rights.
+        I recommend using Copy-Item as an alternative.
+    RegistryProperty type:
+        Namespace was changed from PSRegistry to MartinGC94.PSRegistry.API
+        The type for property ValueKind was changed from Microsoft.Win32.RegistryValueKind to MartinGC94.PSRegistry.API.RegistryValueType.
+        Added properties: TimeStamp, RawValue
 2.0.0:
     cmdlet changes:
         New cmdlet: Rename-RegKey

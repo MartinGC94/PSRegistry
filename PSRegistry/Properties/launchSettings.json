@@ -1,0 +1,18 @@
+{
+  "profiles": {
+    "pwsh": {
+      "commandName": "Executable",
+      "executablePath": "pwsh.exe",
+      "commandLineArgs": "-NoLogo -NoExit -Command gi $(SolutionDir)\\Releases\\$(ProjectName)\\*\\$(ProjectName).psd1 | sort LastWriteTime -Descending | select -First 1 | Import-Module",
+      "workingDirectory": "C:\\",
+      "debugEngines": "managed-dotnet"
+    },
+    "powershell": {
+      "commandName": "Executable",
+      "executablePath": "powershell.exe",
+      "commandLineArgs": "-NoLogo -NoExit -Command gi $(SolutionDir)\\Releases\\$(ProjectName)\\*\\$(ProjectName).psd1 | sort LastWriteTime -Descending | select -First 1 | Import-Module",
+      "workingDirectory": "C:\\",
+      "debugEngines": "managed-framework"
+    }
+  }
+}

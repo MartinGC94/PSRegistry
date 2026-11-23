@@ -8,6 +8,7 @@ Examples include:
 * Remote management without WinRM
 * Easier syntax (no need to create PS drives for HKU and other registry hives, allows both the full and short names for hives like HKLM or HKEY_LOCAL_MACHINE)
 * Ability to mount offline registry hives.
+* Ability to mount UWP package registry hives such as the ones found at %localappdata%\Packages\*\Settings\settings.dat and modify their values.
 
 
 ## Examples
@@ -23,8 +24,5 @@ Add-RegKeyProperty -Key "HKEY_CURRENT_USER\Console" -Property @{
 Mount-RegHive -Path "C:\Users\Default\NTUSER.DAT" -DestinationPath HKLM:\TempMount
 Add-RegKeyProperty -Key HKLM:\TempMount\Console -Name QuickEdit -Value 1 -ValueKind DWord
 Dismount-RegHive -Path HKLM:\TempMount
-
-#Copy the current user console settings to a different user
-Copy-RegKey -Key HKCU:\Console -Destination "HKEY_USERS\S-1-5-21-735598605-1552820368-3346217319-1001\Console"
 
 ```

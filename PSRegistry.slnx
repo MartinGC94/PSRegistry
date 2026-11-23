@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+  </Configurations>
+  <Project Path="PSRegistry/PSRegistry.csproj">
+  </Project>
+</Solution>
